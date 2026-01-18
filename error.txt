@@ -1,0 +1,3 @@
+electron/updater.ts(8,22): error TS6133: 'BrowserWindow' is declared but its value is never read.
+src/components/video-editor/SettingsPanel.tsx(13,26): error TS6196: 'ZoomRegion' is declared but never used.
+src/components/video-editor/VideoEditor.tsx(179,11): error TS6133: 'totalClicks' is declared but its value is never read.
