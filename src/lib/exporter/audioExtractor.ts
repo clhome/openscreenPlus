@@ -190,6 +190,82 @@ export class AudioExtractor {
         });
     }
 
+    /**
+     * 预先编码音频并返回所有块，用于与视频交织写入
+     */
+    async getAllEncodedChunks(): Promise<{ chunk: EncodedAudioChunk; meta?: EncodedAudioChunkMetadata }[]> {
+        if (!this.processedBuffer) return [];
+
+        const buffer = this.processedBuffer;
+        const sampleRate = buffer.sampleRate;
+        const numberOfChannels = buffer.numberOfChannels;
+        const chunks: { chunk: EncodedAudioChunk; meta?: EncodedAudioChunkMetadata }[] = [];
+
+        return new Promise((resolve, reject) => {
+            const encoder = new AudioEncoder({
+                output: (chunk, meta) => {
+                    chunks.push({ chunk, meta });
+                },
+                error: (e) => {
+                    console.error('AudioEncoder error:', e);
+                    reject(e);
+                }
+            });
+
+            encoder.configure({
+                codec: 'mp4a.40.2',
+                sampleRate: sampleRate,
+                numberOfChannels: numberOfChannels,
+                bitrate: 128000,
+            });
+
+            const SAMPLES_PER_CHUNK = 1024 * 4;
+            let offset = 0;
+            const totalSamples = buffer.length;
+
+            const processChunks = async () => {
+                try {
+                    while (offset < totalSamples) {
+                        const length = Math.min(SAMPLES_PER_CHUNK, totalSamples - offset);
+                        const timestampUs = (offset / sampleRate) * 1_000_000;
+
+                        const planarBuffer = new Float32Array(length * numberOfChannels);
+                        for (let ch = 0; ch < numberOfChannels; ch++) {
+                            const channelData = buffer.getChannelData(ch);
+                            planarBuffer.set(channelData.subarray(offset, offset + length), ch * length);
+                        }
+
+                        const audioData = new AudioData({
+                            format: 'f32-planar',
+                            sampleRate: sampleRate,
+                            numberOfFrames: length,
+                            numberOfChannels: numberOfChannels,
+                            timestamp: timestampUs,
+                            data: planarBuffer
+                        });
+
+                        encoder.encode(audioData);
+                        audioData.close();
+
+                        offset += length;
+
+                        if (offset % (sampleRate * 5) < length) {
+                            await new Promise(r => setTimeout(r, 0));
+                        }
+                    }
+
+                    await encoder.flush();
+                    encoder.close();
+                    resolve(chunks);
+                } catch (e) {
+                    reject(e);
+                }
+            };
+
+            processChunks();
+        });
+    }
+
     destroy() {
         this.rawAudioBuffer = null;
         this.processedBuffer = null;

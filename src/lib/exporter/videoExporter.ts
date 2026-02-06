@@ -45,6 +45,7 @@ export class VideoExporter {
   private chunkCount = 0;
   private hasAudio = false;
   private videoElement: HTMLVideoElement | null = null;
+  private audioChunks: { chunk: EncodedAudioChunk; meta?: EncodedAudioChunkMetadata }[] = [];
 
   constructor(config: VideoExporterConfig) {
     this.config = config;
@@ -142,6 +143,11 @@ export class VideoExporter {
         segments.push({ start: 0, end: videoInfo.duration });
       }
 
+      // 3.5 预先编码音频 (如果存在)
+      if (this.hasAudio && this.audioExtractor) {
+        this.audioChunks = await this.audioExtractor.getAllEncodedChunks();
+      }
+
       // 4. MAIN LOOP using Playback + SetTimeout (No rVFC)
       for (const segment of segments) {
         if (this.cancelled) break;
@@ -177,8 +183,12 @@ export class VideoExporter {
         await this.encoder.flush();
       }
 
-      if (this.hasAudio && this.audioExtractor && this.muxer) {
-        await this.audioExtractor.encode(this.muxer);
+      // 写入剩余的所有音频 (如果有)
+      if (this.audioChunks.length > 0 && this.muxer) {
+        for (const { chunk, meta } of this.audioChunks) {
+           await this.muxer.addAudioChunk(chunk, meta);
+        }
+        this.audioChunks = [];
       }
 
       await Promise.all(this.muxingPromises);
@@ -288,7 +298,24 @@ export class VideoExporter {
         console.error("Frame processing error:", e);
       }
 
-      // 4. 移动到下一帧
+      // 4. 交织写入音频
+      // 检查并在当前输出时间之前的音频块写入 Muxer
+      // 使用输出时间戳(output timestamp)而不是输入视频时间(source timestamp)，因为剪辑会导致两者不一致
+      if (this.muxer && this.audioChunks.length > 0) {
+        const currentOutputTimestampUs = this.chunkCount * frameDuration;
+        // 允许音频稍微超前视频一点 (比如 0.5秒)，以确保音频不中断
+        const lookAheadUs = 500_000; 
+        
+        while (this.audioChunks.length > 0 && this.audioChunks[0].chunk.timestamp <= currentOutputTimestampUs + lookAheadUs) {
+           const item = this.audioChunks.shift();
+           if (item) {
+             const { chunk, meta } = item;
+             await this.muxer.addAudioChunk(chunk, meta);
+           }
+        }
+      }
+
+      // 5. 移动到下一帧
       currentVideoTime += frameInterval;
     }
   }
@@ -416,6 +443,7 @@ export class VideoExporter {
     this.videoDescription = undefined;
     this.videoColorSpace = undefined;
     this.hasAudio = false;
+    this.audioChunks = [];
     this.videoElement = null;
   }
 }
