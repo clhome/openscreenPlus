@@ -942,9 +942,14 @@ export default function TimelineEditor({
         </div>
         <div className="flex-1" />
         <div className="flex items-center gap-4 text-[10px] text-slate-500 font-medium">
+          <span className="flex items-center gap-1.5 text-amber-500/80">
+            <kbd className="px-1.5 py-0.5 bg-amber-500/10 border border-amber-500/20 rounded text-amber-400 font-sans">Z</kbd>
+            <span>{t('shortcuts.zoomHint')}</span>
+          </span>
+          <span className="text-white/10">|</span>
           <span className="flex items-center gap-1.5">
             <kbd className="px-1.5 py-0.5 bg-white/5 border border-white/10 rounded text-[#34B27B] font-sans">{shortcuts.pan}</kbd>
-            <span>Pan</span>
+            <span>{t('shortcuts.pan')}</span>
           </span>
           <span className="flex items-center gap-1.5">
             <kbd className="px-1.5 py-0.5 bg-white/5 border border-white/10 rounded text-[#34B27B] font-sans">{shortcuts.zoom}</kbd>

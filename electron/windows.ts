@@ -123,7 +123,7 @@ export function createEditorWindow(): BrowserWindowType {
     resizable: true,
     alwaysOnTop: false,
     skipTaskbar: false,
-    title: 'OpenScreen',
+    title: 'OpenScreenPlus',
     backgroundColor: '#09090b',
     webPreferences: {
       preload: path.join(__dirname, 'preload.mjs'),

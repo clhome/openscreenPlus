@@ -82,5 +82,9 @@
     "selectArea": "Select Area",
     "selectDisplay": "Select Display",
     "noSourceSelected": "No source selected"
+  },
+  "shortcuts": {
+    "pan": "Pan",
+    "zoomHint": "Press 'Z' to add zoom effect"
   }
 }

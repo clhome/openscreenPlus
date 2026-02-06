@@ -102,15 +102,15 @@ function createApplicationMenu() {
     ...(isMac ? [{
       label: app.name,
       submenu: [
-        { role: 'about' as const, label: '关于 OpenScreen' },
+        { role: 'about' as const, label: '关于 OpenScreenPlus' },
         { type: 'separator' as const },
         { role: 'services' as const, label: '服务' },
         { type: 'separator' as const },
-        { role: 'hide' as const, label: '隐藏 OpenScreen' },
+        { role: 'hide' as const, label: '隐藏 OpenScreenPlus' },
         { role: 'hideOthers' as const, label: '隐藏其他' },
         { role: 'unhide' as const, label: '显示全部' },
         { type: 'separator' as const },
-        { role: 'quit' as const, label: '退出 OpenScreen' }
+        { role: 'quit' as const, label: '退出 OpenScreenPlus' }
       ]
     }] : []),
     // 文件菜单
@@ -238,7 +238,7 @@ function getTrayIcon(filename: string) {
 function updateTrayMenu(recording: boolean = false) {
   if (!tray) return;
   const trayIcon = recording ? recordingTrayIcon : defaultTrayIcon;
-  const trayToolTip = recording ? `正在录制: ${selectedSourceName}` : "OpenScreen";
+  const trayToolTip = recording ? `正在录制: ${selectedSourceName}` : "OpenScreenPlus";
   const menuTemplate = recording
     ? [
       {

@@ -173,6 +173,8 @@
     "deleteSelected": "删除选中",
     "panTimeline": "平移时间轴",
     "zoomTimeline": "缩放时间轴",
+    "pan": "平移",
+    "zoomHint": "按 'Z' 键添加放大效果",
     "pausePlay": "暂停/播放",
     "globalShortcuts": "全局快捷键",
     "stopRecording": "停止录制",
