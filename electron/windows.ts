@@ -79,6 +79,18 @@ export function createHudOverlayWindow(): BrowserWindowType {
   });
 
 
+  // 添加加载失败重试逻辑（开发模式下 Vite 可能还没准备好）
+  win.webContents.on('did-fail-load', (_event: Electron.Event, errorCode: number, errorDescription: string) => {
+    console.log(`Window load failed: ${errorCode} - ${errorDescription}, retrying in 500ms...`);
+    if (VITE_DEV_SERVER_URL && errorCode === -102) { // ERR_CONNECTION_REFUSED
+      setTimeout(() => {
+        if (!win.isDestroyed()) {
+          win.loadURL(VITE_DEV_SERVER_URL + '?windowType=hud-overlay');
+        }
+      }, 500);
+    }
+  });
+
   if (VITE_DEV_SERVER_URL) {
     win.loadURL(VITE_DEV_SERVER_URL + '?windowType=hud-overlay')
   } else {

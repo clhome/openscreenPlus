@@ -34,6 +34,10 @@ export default defineConfig({
         : {},
     }),
   ],
+  // 确保 Vite 同时在 IPv4 和 IPv6 上监听
+  server: {
+    host: '127.0.0.1',  // 强制使用 IPv4
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src'),

@@ -90,7 +90,7 @@
     "cropVideo": "裁剪视频",
     "cropDescription": "拖动每一边来调整裁剪区域",
     "motionBlur": "运动模糊",
-    "blur": "模糊",
+    "blur": "背景模糊",
     "shadow": "阴影",
     "roundness": "圆角",
     "padding": "边距",

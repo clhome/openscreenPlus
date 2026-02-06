@@ -33,7 +33,7 @@ import {
 import { VideoExporter, type ExportProgress, type ExportQuality } from "@/lib/exporter";
 import { type AspectRatio, getAspectRatioValue } from "@/utils/aspectRatioUtils";
 import { getAssetPath } from "@/lib/assetPath";
-import { loadMouseData, generateZoomSuggestionsFromClicks, type MouseData } from "@/lib/mouseTracker";
+import { loadMouseData, type MouseData } from "@/lib/mouseTracker";
 
 const WALLPAPER_COUNT = 18;
 const WALLPAPER_PATHS = Array.from({ length: WALLPAPER_COUNT }, (_, i) => `/wallpapers/wallpaper${i + 1}.jpg`);
@@ -133,51 +133,52 @@ export default function VideoEditor() {
     return () => { mounted = false };
   }, []);
 
-  // 当视频加载完成且有点击数据时，自动生成基于点击的缩放区域
-  useEffect(() => {
-    if (!mouseData?.clicks?.length || !duration || duration <= 0) return;
+  // 【已禁用】当视频加载完成且有点击数据时，自动生成基于点击的缩放区域
+  // 用户希望所有放大效果都是手动添加的
+  // useEffect(() => {
+  //   if (!mouseData?.clicks?.length || !duration || duration <= 0) return;
 
-    // 只在第一次加载时生成，避免重复
-    if (zoomRegions.length > 0) return;
+  //   // 只在第一次加载时生成，避免重复
+  //   if (zoomRegions.length > 0) return;
 
-    const video = videoPlaybackRef.current?.video;
-    if (!video || video.videoWidth === 0) return;
+  //   const video = videoPlaybackRef.current?.video;
+  //   if (!video || video.videoWidth === 0) return;
 
-    const videoWidth = video.videoWidth;
-    const videoHeight = video.videoHeight;
+  //   const videoWidth = video.videoWidth;
+  //   const videoHeight = video.videoHeight;
 
-    // 从点击事件生成缩放建议
-    // - defaultDurationMs: 最后一次点击后延续的时间
-    // - mergeThresholdMs: 多久间隔内的点击合并为一组
-    const clickZoomDurationMs = 2000;   // 点击后持续 2 秒
-    const mergeThresholdMs = 1500;      // 1.5秒内的点击合并
+  //   // 从点击事件生成缩放建议
+  //   // - defaultDurationMs: 最后一次点击后延续的时间
+  //   // - mergeThresholdMs: 多久间隔内的点击合并为一组
+  //   const clickZoomDurationMs = 2000;   // 点击后持续 2 秒
+  //   const mergeThresholdMs = 1500;      // 1.5秒内的点击合并
 
-    const suggestions = generateZoomSuggestionsFromClicks(
-      mouseData,
-      videoWidth,
-      videoHeight,
-      clickZoomDurationMs,
-      mergeThresholdMs
-    );
+  //   const suggestions = generateZoomSuggestionsFromClicks(
+  //     mouseData,
+  //     videoWidth,
+  //     videoHeight,
+  //     clickZoomDurationMs,
+  //     mergeThresholdMs
+  //   );
 
-    if (suggestions.length === 0) {
-      return;
-    }
+  //   if (suggestions.length === 0) {
+  //     return;
+  //   }
 
-    // 转换为 ZoomRegion
-    const newZoomRegions: ZoomRegion[] = suggestions.map((suggestion) => ({
-      id: `click-zoom-${nextZoomIdRef.current++}`,
-      startMs: suggestion.suggestedStartMs,
-      endMs: suggestion.suggestedEndMs,
-      depth: DEFAULT_ZOOM_DEPTH,
-      focus: { cx: suggestion.clickX, cy: suggestion.clickY },
-    }));
+  //   // 转换为 ZoomRegion
+  //   const newZoomRegions: ZoomRegion[] = suggestions.map((suggestion) => ({
+  //     id: `click-zoom-${nextZoomIdRef.current++}`,
+  //     startMs: suggestion.suggestedStartMs,
+  //     endMs: suggestion.suggestedEndMs,
+  //     depth: DEFAULT_ZOOM_DEPTH,
+  //     focus: { cx: suggestion.clickX, cy: suggestion.clickY },
+  //   }));
 
-    setZoomRegions(newZoomRegions);
+  //   setZoomRegions(newZoomRegions);
 
-    // 统计信息
+  //   // 统计信息
 
-  }, [mouseData, duration]);
+  // }, [mouseData, duration]);
 
   function togglePlayPause() {
     const playback = videoPlaybackRef.current;
