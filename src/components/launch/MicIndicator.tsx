@@ -15,6 +15,9 @@ interface MicIndicatorProps {
 /**
  * 麦克风音量指示器组件
  * 实时显示麦克风输入的音量波形，帮助用户确认麦克风是否正常工作
+ * 
+ * 注意：使用 setInterval 而不是 requestAnimationFrame 来更新音量，
+ * 避免与视频录制/渲染循环产生冲突导致画面闪烁。
  */
 export function MicIndicator({
     isRecording,
@@ -27,14 +30,14 @@ export function MicIndicator({
     const audioContextRef = useRef<AudioContext | null>(null);
     const analyserRef = useRef<AnalyserNode | null>(null);
     const streamRef = useRef<MediaStream | null>(null);
-    const animationRef = useRef<number | null>(null);
+    const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const dataArrayRef = useRef<Uint8Array | null>(null);
 
     // 清理资源
     const cleanup = useCallback(() => {
-        if (animationRef.current) {
-            cancelAnimationFrame(animationRef.current);
-            animationRef.current = null;
+        if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+            intervalRef.current = null;
         }
         if (streamRef.current) {
             streamRef.current.getTracks().forEach(track => track.stop());
@@ -50,7 +53,7 @@ export function MicIndicator({
         setVolume(0);
     }, []);
 
-    // 更新音量
+    // 更新音量 - 由 setInterval 调用
     const updateVolume = useCallback(() => {
         if (!analyserRef.current || !dataArrayRef.current) return;
 
@@ -66,8 +69,6 @@ export function MicIndicator({
         // 归一化到 0-1 范围
         const normalizedVolume = Math.min(average / 128, 1);
         setVolume(normalizedVolume);
-
-        animationRef.current = requestAnimationFrame(updateVolume);
     }, []);
 
     // 初始化麦克风音频分析
@@ -75,9 +76,11 @@ export function MicIndicator({
         try {
             cleanup();
 
+            // 使用 ideal 而不是 exact 约束，避免与正在录制的流产生冲突
+            // 某些系统上，使用 exact 约束同时访问同一设备可能导致问题
             const constraints: MediaStreamConstraints = {
                 audio: micDeviceId
-                    ? { deviceId: { exact: micDeviceId } }
+                    ? { deviceId: { ideal: micDeviceId } }
                     : true,
                 video: false,
             };
@@ -91,7 +94,7 @@ export function MicIndicator({
             const source = audioContext.createMediaStreamSource(stream);
             const analyser = audioContext.createAnalyser();
             analyser.fftSize = 256;
-            analyser.smoothingTimeConstant = 0.4;
+            analyser.smoothingTimeConstant = 0.5;
 
             source.connect(analyser);
             analyserRef.current = analyser;
@@ -100,9 +103,13 @@ export function MicIndicator({
             dataArrayRef.current = new Uint8Array(bufferLength);
 
             setIsActive(true);
-            updateVolume();
+
+            // 使用 setInterval 而不是 requestAnimationFrame
+            // 每 100ms 更新一次音量，避免与视频渲染循环产生冲突
+            intervalRef.current = setInterval(updateVolume, 100);
 
         } catch (error) {
+            console.warn('MicIndicator: Failed to initialize microphone analyzer:', error);
             setIsActive(false);
         }
     }, [micDeviceId, cleanup, updateVolume]);
@@ -110,7 +117,14 @@ export function MicIndicator({
     // 当录制状态或麦克风设置变化时，初始化或清理
     useEffect(() => {
         if (isRecording && hasMic) {
-            initMicAnalyzer();
+            // 稍微延迟初始化，让录制流先稳定
+            const timer = setTimeout(() => {
+                initMicAnalyzer();
+            }, 200);
+            return () => {
+                clearTimeout(timer);
+                cleanup();
+            };
         } else {
             cleanup();
         }
@@ -152,7 +166,7 @@ export function MicIndicator({
                     return (
                         <div
                             key={i}
-                            className="w-[3px] rounded-full transition-all duration-75"
+                            className="w-[3px] rounded-full transition-all duration-100"
                             style={{
                                 height: barHeight,
                                 backgroundColor: volume > 0.1 ? '#34B27B' : 'rgba(255,255,255,0.3)',

@@ -276,50 +276,55 @@ export function useScreenRecorder(
       }
 
 
-      // 如果有多个音频轨道，需要混合它们
+      // 分离视频和音频轨道
       const audioTracks = tracks.filter(t => t.kind === 'audio');
       const videoTracks = tracks.filter(t => t.kind === 'video');
 
       let finalStream: MediaStream;
 
-      if (audioTracks.length > 1) {
-        // 使用 AudioContext 混合多个音频轨道
+      // 当有音频轨道时（无论是麦克风还是系统音频），都通过 AudioContext 处理
+      // 这确保音频被正确缓冲和同步，避免与视频帧率不匹配导致画面闪烁
+      if (audioTracks.length > 0) {
         const audioContext = new AudioContext();
         const destination = audioContext.createMediaStreamDestination();
 
-        // 创建动态压缩器，防止音量过载导致削波失真
-        const compressor = audioContext.createDynamicsCompressor();
-        compressor.threshold.value = -24;  // 触发压缩的阈值 (dB)
-        compressor.knee.value = 30;        // 压缩过渡的平滑度
-        compressor.ratio.value = 12;       // 压缩比
-        compressor.attack.value = 0.003;   // 起始时间 (秒)
-        compressor.release.value = 0.25;   // 释放时间 (秒)
-        compressor.connect(destination);
+        if (audioTracks.length > 1) {
+          // 多个音频轨道：使用压缩器和增益节点混合
+          const compressor = audioContext.createDynamicsCompressor();
+          compressor.threshold.value = -24;
+          compressor.knee.value = 30;
+          compressor.ratio.value = 12;
+          compressor.attack.value = 0.003;
+          compressor.release.value = 0.25;
+          compressor.connect(destination);
 
-        // 计算每个音轨的增益值，防止叠加后音量过载
-        // 使用动态增益：轨道越多，每个轨道增益越低
-        const gainPerTrack = Math.min(0.6, 1.0 / audioTracks.length);
+          const gainPerTrack = Math.min(0.6, 1.0 / audioTracks.length);
 
-        audioTracks.forEach((track) => {
-          const source = audioContext.createMediaStreamSource(new MediaStream([track]));
-
-          // 创建增益节点来控制音量
+          audioTracks.forEach((track) => {
+            const source = audioContext.createMediaStreamSource(new MediaStream([track]));
+            const gainNode = audioContext.createGain();
+            gainNode.gain.value = gainPerTrack;
+            source.connect(gainNode);
+            gainNode.connect(compressor);
+          });
+        } else {
+          // 单个音频轨道（例如只有麦克风）：也通过 AudioContext 处理
+          // 这样可以确保音频流与视频流的时钟同步
+          const source = audioContext.createMediaStreamSource(new MediaStream([audioTracks[0]]));
           const gainNode = audioContext.createGain();
-          gainNode.gain.value = gainPerTrack;
-
-          // 连接：音源 -> 增益节点 -> 压缩器 -> 目标
+          gainNode.gain.value = 1.0;  // 保持原始音量
           source.connect(gainNode);
-          gainNode.connect(compressor);
+          gainNode.connect(destination);
+        }
 
-        });
-
-        // 创建最终的流：视频轨道 + 混合后的音频轨道
+        // 创建最终的流：视频轨道 + 处理后的音频轨道
         finalStream = new MediaStream([
           ...videoTracks,
           ...destination.stream.getAudioTracks()
         ]);
       } else {
-        finalStream = new MediaStream(tracks);
+        // 无音频（静音模式）：只使用视频轨道
+        finalStream = new MediaStream(videoTracks);
       }
 
       stream.current = finalStream;
