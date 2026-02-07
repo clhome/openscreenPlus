@@ -127,8 +127,11 @@
 git clone https://github.com/yzz05220-rgb/openscreen-chinese.git
 cd openscreen-chinese
 
+
 # 安装依赖
 npm install
+#安装失败可时设置镜像后再安装
+npm config set registry https://registry.npmmirror.com
 
 # 开发模式运行
 npm run dev
@@ -141,9 +144,15 @@ npm run build:mac
 
 # 打包 Linux 版本
 npm run build:linux
+
+# 导出速度修改 默认2倍速导出
+openscreenPlus\src\lib\exporter\videoExporter.ts
+video.playbackRate = 2.0;
 ```
 
 ---
+
+
 
 ## 🔧 平台特定说明
 

@@ -38,7 +38,7 @@ export class VideoExporter {
   private audioExtractor: AudioExtractor | null = null;
   private cancelled = false;
   private encodeQueue = 0;
-  private readonly MAX_ENCODE_QUEUE = 60; // 增大队列限制，提升导出速度
+  private readonly MAX_ENCODE_QUEUE = 60;
   private videoDescription: Uint8Array | undefined;
   private videoColorSpace: VideoColorSpaceInit | undefined;
   private muxingPromises: Promise<void>[] = [];
@@ -46,6 +46,10 @@ export class VideoExporter {
   private hasAudio = false;
   private videoElement: HTMLVideoElement | null = null;
   private audioChunks: { chunk: EncodedAudioChunk; meta?: EncodedAudioChunkMetadata }[] = [];
+  
+  // 导出加速倍数：2.0 表示 2 倍速导出
+  // 音频时间戳会相应调整以保持同步
+  private readonly PLAYBACK_SPEED = 2.0;
 
   constructor(config: VideoExporterConfig) {
     this.config = config;
@@ -104,7 +108,9 @@ export class VideoExporter {
           endMs: t.endMs,
         })),
       });
+      console.log('[VideoExporter] Starting audio decode...');
       this.hasAudio = await this.audioExtractor.decode();
+      console.log('[VideoExporter] Audio decode result:', this.hasAudio);
 
       this.muxer = new VideoMuxer(this.config, this.hasAudio);
       await this.muxer.initialize();
@@ -114,9 +120,7 @@ export class VideoExporter {
       const totalFrames = Math.ceil(effectiveDuration * this.config.frameRate);
       const frameDuration = 1_000_000 / this.config.frameRate;
 
-      this.videoElement.playbackRate = 1.0;
       this.videoElement.muted = true;
-      // 禁用 loop, 防止播完自动重播导致逻辑混乱
       this.videoElement.loop = false;
 
       const startTime = performance.now();
@@ -146,32 +150,21 @@ export class VideoExporter {
       // 3.5 预先编码音频 (如果存在)
       if (this.hasAudio && this.audioExtractor) {
         this.audioChunks = await this.audioExtractor.getAllEncodedChunks();
+        console.log('[VideoExporter] Audio chunks extracted:', this.audioChunks.length);
       }
 
-      // 4. MAIN LOOP using Playback + SetTimeout (No rVFC)
+      // 4. 使用播放模式导出
       for (const segment of segments) {
         if (this.cancelled) break;
 
-        // Seek and Play
-        this.videoElement.currentTime = segment.start;
-        await new Promise<void>((resolve) => {
-          const onSeeked = () => {
-            this.videoElement!.removeEventListener("seeked", onSeeked);
-            resolve();
-          };
-          this.videoElement!.addEventListener("seeked", onSeeked, {
-            once: true,
-          });
-        });
-
-        await this.recordSegment(
+        await this.recordSegmentWithPlayback(
           this.videoElement,
+          segment.start,
           segment.end,
           frameDuration,
           totalFrames,
           startTime,
           () => processedFrames++,
-          segment.start,
         );
       }
 
@@ -185,8 +178,10 @@ export class VideoExporter {
 
       // 写入剩余的所有音频 (如果有)
       if (this.audioChunks.length > 0 && this.muxer) {
+        console.log('[VideoExporter] Writing remaining audio chunks:', this.audioChunks.length);
         for (const { chunk, meta } of this.audioChunks) {
-           await this.muxer.addAudioChunk(chunk, meta);
+           // 剩余音频也需要调整时间戳
+           await this.muxer.addAudioChunkWithAdjustedTimestamp(chunk, meta, this.PLAYBACK_SPEED);
         }
         this.audioChunks = [];
       }
@@ -213,111 +208,194 @@ export class VideoExporter {
     }
   }
 
-  private async recordSegment(
+  /**
+   * 使用视频正常播放的方式导出，而不是快速 seek
+   * 这样可以保证每帧都是完整解码的，避免 WGC 错误
+   */
+  private async recordSegmentWithPlayback(
     video: HTMLVideoElement,
+    startTime: number,
     endTime: number,
     frameDuration: number,
     totalFrames: number,
     globalStartTime: number,
     onFrameProcessed: () => void,
-    segmentStartTime: number,
   ): Promise<void> {
-    // 使用 seek-based 快速导出方式，不再使用实时播放
-    const frameInterval = 1 / this.config.frameRate; // 每帧时间间隔（秒）
-    let currentVideoTime = segmentStartTime;
-
-    while (currentVideoTime < endTime && !this.cancelled) {
-      // 1. 等待编码队列有空间
-      while (this.encodeQueue > this.MAX_ENCODE_QUEUE && !this.cancelled) {
-        await new Promise((resolve) => setTimeout(resolve, 10));
-      }
-      if (this.cancelled) break;
-
-      // 2. Seek 到目标时间
-      video.currentTime = currentVideoTime;
-      await new Promise<void>((resolve) => {
-        const onSeeked = () => {
-          video.removeEventListener("seeked", onSeeked);
+    const targetFrameInterval = 1 / this.config.frameRate;
+    
+    // 使用加速播放提高导出速度
+    video.playbackRate = this.PLAYBACK_SPEED;
+    
+    // Seek 到起始位置
+    video.currentTime = startTime;
+    await new Promise<void>((resolve) => {
+      const onSeeked = () => {
+        video.removeEventListener("seeked", onSeeked);
+        resolve();
+      };
+      video.addEventListener("seeked", onSeeked, { once: true });
+    });
+    
+    // 开始播放
+    await video.play().catch((e) => console.error("Play failed:", e));
+    
+    let nextFrameTime = startTime;
+    let isPausedForCapture = false;
+    
+    return new Promise<void>((resolve, reject) => {
+      let animationFrameId: number | null = null;
+      
+      const captureLoop = async () => {
+        if (this.cancelled) {
+          cleanup();
           resolve();
-        };
-        video.addEventListener("seeked", onSeeked, { once: true });
-        // 如果已经在目标位置，直接 resolve
-        if (Math.abs(video.currentTime - currentVideoTime) < 0.01) {
-          video.removeEventListener("seeked", onSeeked);
-          resolve();
+          return;
         }
-      });
-
-      // 3. 采样当前帧
-      try {
-        const timestamp = this.chunkCount * frameDuration;
-
-        // Render
-        const videoFrame = new VideoFrame(video, { timestamp: 0 });
-        await this.renderer!.renderFrame(videoFrame, currentVideoTime * 1000000);
-        videoFrame.close();
-
-        const canvas = this.renderer!.getCanvas();
-
-        // Encode
-        // @ts-expect-error VideoFrame constructor
-        const exportFrame = new VideoFrame(canvas, {
-          timestamp: timestamp,
-          duration: frameDuration,
-          colorSpace: {
-            primaries: "bt709",
-            transfer: "iec61966-2-1",
-            matrix: "rgb",
-            fullRange: true,
-          },
-        });
-
-        if (this.encoder && this.encoder.state === "configured") {
-          this.encodeQueue++;
-          const isKeyFrame = this.chunkCount % (this.config.frameRate * 2) === 0;
-          this.encoder.encode(exportFrame, { keyFrame: isKeyFrame });
-        }
-        exportFrame.close();
-
-        this.chunkCount++;
-        onFrameProcessed();
-
-        // Progress - 每 5 帧更新一次
-        if (this.config.onProgress && this.chunkCount % 5 === 0) {
-          const elapsed = (performance.now() - globalStartTime) / 1000;
-          const fps = this.chunkCount / (elapsed || 1);
-          const remaining = (totalFrames - this.chunkCount) / fps;
-          this.config.onProgress({
-            currentFrame: this.chunkCount,
-            totalFrames: totalFrames,
-            percentage: Math.min(99, (this.chunkCount / totalFrames) * 100),
-            estimatedTimeRemaining: remaining,
-          });
-        }
-      } catch (e) {
-        console.error("Frame processing error:", e);
-      }
-
-      // 4. 交织写入音频
-      // 检查并在当前输出时间之前的音频块写入 Muxer
-      // 使用输出时间戳(output timestamp)而不是输入视频时间(source timestamp)，因为剪辑会导致两者不一致
-      if (this.muxer && this.audioChunks.length > 0) {
-        const currentOutputTimestampUs = this.chunkCount * frameDuration;
-        // 允许音频稍微超前视频一点 (比如 0.5秒)，以确保音频不中断
-        const lookAheadUs = 500_000; 
         
-        while (this.audioChunks.length > 0 && this.audioChunks[0].chunk.timestamp <= currentOutputTimestampUs + lookAheadUs) {
-           const item = this.audioChunks.shift();
-           if (item) {
-             const { chunk, meta } = item;
-             await this.muxer.addAudioChunk(chunk, meta);
-           }
+        const currentTime = video.currentTime;
+        
+        // 流控逻辑：如果视频播放太快（超过下一帧时间 0.1秒），暂停等待捕获
+        // 这样可以防止 2倍速播放导致跳帧或提前结束
+        if (!video.paused && currentTime > nextFrameTime + 0.1) {
+          video.pause();
+          isPausedForCapture = true;
         }
-      }
-
-      // 5. 移动到下一帧
-      currentVideoTime += frameInterval;
-    }
+        
+        // 如果已经追上进度（小于 0.05秒差距），且是因为捕获暂停的，则恢复播放
+        if (isPausedForCapture && currentTime <= nextFrameTime + 0.05 && !video.ended) {
+          await video.play().catch(() => {});
+          isPausedForCapture = false;
+        }
+        
+        // 检查是否需要捕获当前帧
+        // 我们允许 currentTime 稍微超过 nextFrameTime，只要不超过太远
+        if (currentTime >= nextFrameTime) {
+          // 等待编码队列有空间
+          while (this.encodeQueue > this.MAX_ENCODE_QUEUE && !this.cancelled) {
+            await new Promise((r) => setTimeout(r, 5));
+          }
+          
+          if (this.cancelled) {
+            cleanup();
+            resolve();
+            return;
+          }
+          
+          try {
+            const timestamp = this.chunkCount * frameDuration;
+            
+            // 调试日志（只打印前几帧）
+            if (this.chunkCount < 5) {
+               console.log(`[VideoExporter] Capture frame ${this.chunkCount}: time=${timestamp}μs, videoTime=${currentTime}s`);
+            }
+            
+            // 直接从播放中的视频创建 VideoFrame
+            const videoFrame = new VideoFrame(video, { timestamp: 0 });
+            await this.renderer!.renderFrame(videoFrame, currentTime * 1000000);
+            videoFrame.close();
+            
+            const canvas = this.renderer!.getCanvas();
+            
+            const exportFrame = new VideoFrame(canvas, {
+              timestamp: timestamp,
+              duration: frameDuration,
+            });
+            
+            this.encodeQueue++;
+            this.encoder!.encode(exportFrame, { keyFrame: this.chunkCount % 150 === 0 });
+            exportFrame.close();
+            this.chunkCount++;
+            
+            onFrameProcessed();
+            
+            // 交织写入音频
+            // 恢复为原始逻辑：直接写入音频块，不需要调整时间戳
+            // 因为我们现在保证了视频帧是完整的，音视频是对齐的
+            if (this.muxer && this.audioChunks.length > 0) {
+              const currentOutputTimestampUs = this.chunkCount * frameDuration;
+              const lookAheadUs = 500_000; // 0.5秒预读
+              
+              while (
+                this.audioChunks.length > 0 &&
+                this.audioChunks[0].chunk.timestamp <= currentOutputTimestampUs + lookAheadUs
+              ) {
+                const item = this.audioChunks.shift();
+                if (item) {
+                  const { chunk, meta } = item;
+                  await this.muxer.addAudioChunk(chunk, meta);
+                }
+              }
+            }
+            
+            // Progress
+            if (this.config.onProgress && this.chunkCount % 5 === 0) {
+              const elapsed = (performance.now() - globalStartTime) / 1000;
+              const fps = this.chunkCount / (elapsed || 1);
+              const remaining = (totalFrames - this.chunkCount) / fps;
+              this.config.onProgress({
+                currentFrame: this.chunkCount,
+                totalFrames: totalFrames,
+                percentage: Math.min(Math.round((this.chunkCount / totalFrames) * 100), 100),
+                estimatedTimeRemaining: Math.ceil(remaining),
+              });
+            }
+            
+            // 推进到下一帧
+            nextFrameTime += targetFrameInterval;
+            
+            // 如果连续捕获，确保稍微让出主线程
+            if (video.currentTime >= nextFrameTime) {
+                // 如果还落后很多，可能需要在同一帧循环里多捕获几次吗？
+                // 不，requestAnimationFrame 循环通常足够快。
+                // 如果我们在这里由循环捕获，画面会重复。
+                // 我们让循环继续。
+            }
+            
+          } catch (e) {
+            console.error("Frame capture error:", e);
+          }
+        }
+        
+        // 结束条件：必须在所有帧都处理完，或者视频真的结束了且我们也到了末尾
+        // 注意：endTime 是片段结束时间
+        if ((video.ended || currentTime >= endTime) && currentTime < nextFrameTime) {
+             // 视频播完了，且我们没有下一帧要捕获了（nextFrameTime > currentTime 说明我们已经捕获到了尽头）
+             cleanup();
+             resolve();
+             return;
+        }
+        
+        // 如果视频结束了，但 nextFrameTime 还没到？说明我们丢帧了。
+        // 但有了流控，这种情况应该很罕见。如果真的发生，强制退出避免死循环。
+        if (video.ended && this.chunkCount < totalFrames * 0.99) {
+             console.warn("Video ended early, some frames might be missing.");
+             cleanup();
+             resolve();
+             return;
+        }
+        
+        animationFrameId = requestAnimationFrame(captureLoop);
+      };
+      
+      const onError = (e: Event) => {
+        console.error("Video playback error", e);
+        cleanup();
+        reject(new Error("Video playback error"));
+      };
+      
+      const cleanup = () => {
+        if (animationFrameId !== null) {
+          cancelAnimationFrame(animationFrameId);
+          animationFrameId = null;
+        }
+        video.removeEventListener("error", onError);
+        video.pause();
+      };
+      
+      video.addEventListener("error", onError, { once: true });
+      
+      animationFrameId = requestAnimationFrame(captureLoop);
+    });
   }
 
   private async initializeEncoder(): Promise<void> {
@@ -340,15 +418,10 @@ export class VideoExporter {
         }
 
         const isFirstChunk = this.chunkCount === 0;
-        // 注意：chunkCount 在 recordSegment 里已经递增了，这里是 encode output callback
-        // 用闭包里的局部变量标记第一帧可能不准，最好检查 chunk.timestamp
-        // 但这里我们只关心 header
 
         const muxingPromise = (async () => {
           try {
             if (isFirstChunk && this.videoDescription) {
-              // 这里逻辑稍有风险，改用 videoDescription 判空
-              // 其实只要 videoDescription 刚拿到，就应该是头
               const colorSpace = this.videoColorSpace || {
                 primaries: "bt709",
                 transfer: "iec61966-2-1",
@@ -391,16 +464,16 @@ export class VideoExporter {
       height: this.config.height,
       bitrate: this.config.bitrate,
       framerate: this.config.frameRate,
-      latencyMode: "realtime", // Play模式用 realtime 更好
+      latencyMode: "quality",
       bitrateMode: "variable",
-      hardwareAcceleration: "prefer-hardware",
+      hardwareAcceleration: "prefer-software",
     };
 
-    const hardwareSupport = await VideoEncoder.isConfigSupported(encoderConfig);
-    if (hardwareSupport.supported) {
+    const support = await VideoEncoder.isConfigSupported(encoderConfig);
+    if (support.supported) {
       this.encoder.configure(encoderConfig);
     } else {
-      encoderConfig.hardwareAcceleration = "prefer-software";
+      encoderConfig.hardwareAcceleration = "no-preference";
       this.encoder.configure(encoderConfig);
     }
   }

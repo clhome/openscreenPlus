@@ -72,6 +72,43 @@ export class VideoMuxer {
     await this.audioSource.add(packet, meta);
   }
 
+  /**
+   * 添加音频块并调整时间戳（用于加速导出）
+   * @param chunk 原始音频块
+   * @param meta 元数据
+   * @param playbackSpeed 播放速度（例如 2.0 表示 2 倍速）
+   */
+  async addAudioChunkWithAdjustedTimestamp(
+    chunk: EncodedAudioChunk, 
+    meta: EncodedAudioChunkMetadata | undefined,
+    playbackSpeed: number
+  ): Promise<void> {
+    if (!this.audioSource) {
+      throw new Error('Audio not configured for this muxer');
+    }
+
+    // 计算调整后的时间戳和持续时间（转换为秒）
+    const adjustedTimestamp = chunk.timestamp / playbackSpeed / 1_000_000; // 秒
+    const adjustedDuration = chunk.duration 
+      ? (chunk.duration / playbackSpeed / 1_000_000) 
+      : 0; // 秒
+    
+    // 复制原始数据
+    const buffer = new Uint8Array(chunk.byteLength);
+    chunk.copyTo(buffer);
+    
+    // 创建新的 EncodedPacket 并使用调整后的时间戳
+    const packet = new EncodedPacket(
+      buffer,
+      chunk.type === 'key' ? 'key' : 'delta',
+      adjustedTimestamp,
+      adjustedDuration
+    );
+
+    // 添加到音频源
+    await this.audioSource.add(packet, meta);
+  }
+
   async finalize(): Promise<Blob> {
     if (!this.output || !this.target) {
       throw new Error('Muxer not initialized');

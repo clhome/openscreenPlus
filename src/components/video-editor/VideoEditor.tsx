@@ -47,10 +47,10 @@ export default function VideoEditor() {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [wallpaper, setWallpaper] = useState<string>(WALLPAPER_PATHS[0]);
-  const [shadowIntensity, setShadowIntensity] = useState(0);
-  const [showBlur, setShowBlur] = useState(false);
-  const [motionBlurEnabled, setMotionBlurEnabled] = useState(true);
-  const [borderRadius, setBorderRadius] = useState(0);
+  const [shadowIntensity, setShadowIntensity] = useState(0.58);
+  const [showBlur, setShowBlur] = useState(true);
+  const [motionBlurEnabled, setMotionBlurEnabled] = useState(false);
+  const [borderRadius, setBorderRadius] = useState(8.5);
   const [padding, setPadding] = useState(10);
   const [cropRegion, setCropRegion] = useState<CropRegion>(DEFAULT_CROP_REGION);
   const [zoomRegions, setZoomRegions] = useState<ZoomRegion[]>([]);
@@ -374,7 +374,7 @@ export default function VideoEditor() {
       });
       return updated;
     });
-  }, []);;
+  }, []);
 
   const handleAnnotationTypeChange = useCallback((id: string, type: AnnotationRegion['type']) => {
     setAnnotationRegions((prev) => {
@@ -694,7 +694,7 @@ export default function VideoEditor() {
       setIsExporting(false);
       exporterRef.current = null;
     }
-  }, [videoPath, wallpaper, zoomRegions, trimRegions, shadowIntensity, showBlur, motionBlurEnabled, borderRadius, padding, cropRegion, annotationRegions, isPlaying, aspectRatio, exportQuality]);
+  }, [videoPath, wallpaper, zoomRegions, trimRegions, shadowIntensity, showBlur, motionBlurEnabled, borderRadius, padding, cropRegion, annotationRegions, isPlaying, aspectRatio, exportQuality, t]);
 
   const handleCancelExport = useCallback(() => {
     if (exporterRef.current) {

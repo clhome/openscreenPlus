@@ -46,6 +46,7 @@ export class AudioExtractor {
 
             return true;
         } catch (error) {
+            console.warn('[AudioExtractor] Failed to decode audio:', error);
             return false;
         }
     }
