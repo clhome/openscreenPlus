@@ -4,6 +4,7 @@
   directories: {
     output: "release",
   },
+  files: ["dist", "dist-electron", "package.json"],
   win: {
     icon: "icons/icons/win/icon.ico",
     target: [

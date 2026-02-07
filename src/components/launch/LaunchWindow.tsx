@@ -227,7 +227,7 @@ export function LaunchWindow() {
   }, []);
 
   return (
-    <div className="w-full h-full flex items-center justify-center bg-transparent hud-overlay" style={{ paddingTop: '200px' }}>
+    <div className="w-full h-full flex items-center justify-center bg-transparent hud-overlay">
       <div
         className={`w-full max-w-[500px] mx-auto flex items-center justify-between px-4 py-2 ${styles.electronDrag}`}
         style={{
