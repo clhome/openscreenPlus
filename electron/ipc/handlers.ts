@@ -274,7 +274,12 @@ export function registerIpcHandlers(
 
   ipcMain.handle('save-exported-video', async (_: unknown, videoData: ArrayBuffer, fileName: string) => {
     try {
-      const result = await dialog.showSaveDialog({
+      // Get focused window to use as parent for the dialog
+      // This allows the system dialog to be properly sized and modal
+      const { BrowserWindow } = require('electron');
+      const parentWindow = BrowserWindow.getFocusedWindow();
+      
+      const result = await dialog.showSaveDialog(parentWindow, {
         title: 'Save Exported Video',
         defaultPath: path.join(app.getPath('downloads'), fileName),
         filters: [

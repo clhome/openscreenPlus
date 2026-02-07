@@ -223,7 +223,21 @@ function createWindow() {
 }
 
 function createTray() {
-  tray = new Tray(defaultTrayIcon);
+  const trayInstance = new Tray(defaultTrayIcon);
+  tray = trayInstance;
+  
+  // 双击托盘图标时显示主窗口
+  trayInstance.on('double-click', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (mainWindow.isMinimized()) {
+        mainWindow.restore();
+      }
+      mainWindow.show();
+      mainWindow.focus();
+    } else {
+      createWindow();
+    }
+  });
 }
 
 function getTrayIcon(filename: string) {
