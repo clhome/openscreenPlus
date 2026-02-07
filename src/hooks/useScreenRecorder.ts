@@ -17,6 +17,7 @@ export function useScreenRecorder(
   const [recording, setRecording] = useState(false);
   const [paused, setPaused] = useState(false);
   const mediaRecorder = useRef<MediaRecorder | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
   const stream = useRef<MediaStream | null>(null);
   const chunks = useRef<Blob[]>([]);
   const startTime = useRef<number>(0);
@@ -81,6 +82,11 @@ export function useScreenRecorder(
       pausedTime.current = 0;
 
       window.electronAPI?.setRecordingState(false);
+
+      if (audioCtxRef.current) {
+        audioCtxRef.current.close();
+        audioCtxRef.current = null;
+      }
     }
   });
 
@@ -126,6 +132,10 @@ export function useScreenRecorder(
       if (stream.current) {
         stream.current.getTracks().forEach(track => track.stop());
         stream.current = null;
+      }
+      if (audioCtxRef.current) {
+        audioCtxRef.current.close();
+        audioCtxRef.current = null;
       }
     };
   }, []);
@@ -282,12 +292,14 @@ export function useScreenRecorder(
 
       let finalStream: MediaStream;
 
-      // 当有音频轨道时（无论是麦克风还是系统音频），都通过 AudioContext 处理
+      // 无论是否有音频轨道，都通过 AudioContext 处理
       // 这确保音频被正确缓冲和同步，避免与视频帧率不匹配导致画面闪烁
-      if (audioTracks.length > 0) {
-        const audioContext = new AudioContext();
-        const destination = audioContext.createMediaStreamDestination();
+      // 即使是静音模式，也生成一个静音轨道来保持同步
+      const audioContext = new AudioContext();
+      audioCtxRef.current = audioContext;
+      const destination = audioContext.createMediaStreamDestination();
 
+      if (audioTracks.length > 0) {
         if (audioTracks.length > 1) {
           // 多个音频轨道：使用压缩器和增益节点混合
           const compressor = audioContext.createDynamicsCompressor();
@@ -316,16 +328,22 @@ export function useScreenRecorder(
           source.connect(gainNode);
           gainNode.connect(destination);
         }
-
-        // 创建最终的流：视频轨道 + 处理后的音频轨道
-        finalStream = new MediaStream([
-          ...videoTracks,
-          ...destination.stream.getAudioTracks()
-        ]);
       } else {
-        // 无音频（静音模式）：只使用视频轨道
-        finalStream = new MediaStream(videoTracks);
+        // 无音频（静音模式）：创建一个静音信号
+        // 添加一个增益为0的振荡器，确保 AudioContext 处于活跃状态并提供时钟信号
+        const oscillator = audioContext.createOscillator();
+        const silentGain = audioContext.createGain();
+        silentGain.gain.value = 0;
+        oscillator.connect(silentGain);
+        silentGain.connect(destination);
+        oscillator.start();
       }
+
+      // 创建最终的流：视频轨道 + 处理后的音频轨道
+      finalStream = new MediaStream([
+        ...videoTracks,
+        ...destination.stream.getAudioTracks()
+      ]);
 
       stream.current = finalStream;
       if (!stream.current) {
