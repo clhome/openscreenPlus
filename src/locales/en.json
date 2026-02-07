@@ -37,7 +37,8 @@
     "audio_none_short": "Mute",
     "audio_system_short": "System",
     "audio_mic_short": "Mic",
-    "audio_both_short": "All"
+    "audio_both_short": "All",
+    "countdownHint": "Press ESC to cancel"
   },
   "editor": {
     "title": "Video Editor",

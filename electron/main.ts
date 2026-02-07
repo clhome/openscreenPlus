@@ -5,7 +5,7 @@ import { type BrowserWindow as BrowserWindowType, type Tray as TrayType } from '
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import fs from 'node:fs/promises'
-import { createHudOverlayWindow, createEditorWindow, createSourceSelectorWindow } from './windows'
+import { createHudOverlayWindow, createEditorWindow, createSourceSelectorWindow, createCountdownWindow } from './windows'
 import { registerIpcHandlers } from './ipc/handlers'
 import { initAutoUpdater } from './updater'
 
@@ -346,6 +346,50 @@ app.whenReady().then(async () => {
     await saveShortcutSettings(currentShortcuts);
     registerGlobalShortcuts();
     return { success: true };
+  });
+
+  // 倒计时窗口管理
+  let countdownWindow: BrowserWindowType | null = null;
+
+  ipcMain.handle('show-countdown', () => {
+    if (countdownWindow && !countdownWindow.isDestroyed()) {
+      countdownWindow.focus();
+      return { success: true };
+    }
+    countdownWindow = createCountdownWindow();
+    countdownWindow.on('closed', () => {
+      countdownWindow = null;
+    });
+    return { success: true };
+  });
+
+  ipcMain.handle('close-countdown', () => {
+    if (countdownWindow && !countdownWindow.isDestroyed()) {
+      countdownWindow.close();
+      countdownWindow = null;
+    }
+    return { success: true };
+  });
+
+  // 倒计时窗口事件转发到主窗口
+  ipcMain.on('countdown-complete-from-window', () => {
+    if (countdownWindow && !countdownWindow.isDestroyed()) {
+      countdownWindow.close();
+      countdownWindow = null;
+    }
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('countdown-complete');
+    }
+  });
+
+  ipcMain.on('countdown-cancelled-from-window', () => {
+    if (countdownWindow && !countdownWindow.isDestroyed()) {
+      countdownWindow.close();
+      countdownWindow = null;
+    }
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('countdown-cancelled');
+    }
   });
 
   // 设置权限处理器，自动授予音频和视频权限

@@ -98,4 +98,31 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getMouseData: (videoPath: string) => {
     return ipcRenderer.invoke('get-mouse-data', videoPath)
   },
+  // 倒计时窗口
+  showCountdown: () => {
+    return ipcRenderer.invoke('show-countdown')
+  },
+  closeCountdown: () => {
+    return ipcRenderer.invoke('close-countdown')
+  },
+  // 倒计时完成事件监听（由倒计时窗口发送，HUD 窗口接收）
+  onCountdownComplete: (callback: () => void) => {
+    const listener = () => callback()
+    ipcRenderer.on('countdown-complete', listener)
+    return () => ipcRenderer.removeListener('countdown-complete', listener)
+  },
+  // 倒计时取消事件监听
+  onCountdownCancelled: (callback: () => void) => {
+    const listener = () => callback()
+    ipcRenderer.on('countdown-cancelled', listener)
+    return () => ipcRenderer.removeListener('countdown-cancelled', listener)
+  },
+  // 倒计时窗口用：发送完成事件
+  sendCountdownComplete: () => {
+    ipcRenderer.send('countdown-complete-from-window')
+  },
+  // 倒计时窗口用：发送取消事件
+  sendCountdownCancelled: () => {
+    ipcRenderer.send('countdown-cancelled-from-window')
+  },
 })

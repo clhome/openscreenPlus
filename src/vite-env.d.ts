@@ -64,6 +64,13 @@ interface Window {
     hudOverlayHide: () => void
     hudOverlayClose: () => void
     resizeOverlay: (width: number, height: number) => Promise<{ success: boolean }>
+    // 倒计时窗口
+    showCountdown: () => Promise<{ success: boolean }>
+    closeCountdown: () => Promise<{ success: boolean }>
+    onCountdownComplete: (callback: () => void) => () => void
+    onCountdownCancelled: (callback: () => void) => () => void
+    sendCountdownComplete: () => void
+    sendCountdownCancelled: () => void
   }
 }
 

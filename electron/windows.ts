@@ -188,3 +188,43 @@ export function createSourceSelectorWindow(): BrowserWindowType {
 
   return win
 }
+
+export function createCountdownWindow(): BrowserWindowType {
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width, height } = primaryDisplay.bounds;
+
+  const win = new BrowserWindow({
+    width: width,
+    height: height,
+    x: primaryDisplay.bounds.x,
+    y: primaryDisplay.bounds.y,
+    frame: false,
+    transparent: true,
+    resizable: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    hasShadow: false,
+    focusable: true,
+    fullscreen: false,
+    icon: nativeImage.createFromPath(ICON_PATH),
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.mjs'),
+      nodeIntegration: false,
+      contextIsolation: true,
+    },
+  });
+
+  // 设置窗口为全屏但不使用系统全屏模式
+  win.setFullScreen(false);
+  win.setBounds({ x: primaryDisplay.bounds.x, y: primaryDisplay.bounds.y, width, height });
+
+  if (VITE_DEV_SERVER_URL) {
+    win.loadURL(VITE_DEV_SERVER_URL + '?windowType=countdown');
+  } else {
+    win.loadFile(path.join(RENDERER_DIST, 'index.html'), {
+      query: { windowType: 'countdown' }
+    });
+  }
+
+  return win;
+}

@@ -57,7 +57,8 @@
     "tip_title": "温馨提示",
     "tip_content": "录制开始后，窗口将自动隐藏。您可以在系统托盘（右下角）点击图标停止录制。",
     "dont_show_again": "不再提醒",
-    "start_recording": "开始录制"
+    "start_recording": "开始录制",
+    "countdownHint": "按 ESC 取消"
   },
   "editor": {
     "title": "视频编辑器",

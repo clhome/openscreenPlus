@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useTranslation } from 'react-i18next';
 import styles from "./LaunchWindow.module.css";
 import { useScreenRecorder } from "../../hooks/useScreenRecorder";
@@ -82,6 +82,39 @@ export function LaunchWindow() {
   };
   const [selectedSource, setSelectedSource] = useState<string | null>(null);
   const [hasSelectedSource, setHasSelectedSource] = useState(false);
+  const [showCountdown, setShowCountdown] = useState(false);
+
+  // 处理录制按钮点击
+  const handleRecordClick = useCallback(() => {
+    if (recording) {
+      // 正在录制时，直接停止
+      toggleRecording();
+    } else if (hasSelectedSource) {
+      // 有选择源时，显示全屏倒计时窗口
+      setShowCountdown(true);
+      window.electronAPI?.showCountdown();
+    } else {
+      // 没有选择源时，打开源选择器
+      openSourceSelector();
+    }
+  }, [recording, hasSelectedSource, toggleRecording]);
+
+  // 监听倒计时完成事件
+  useEffect(() => {
+    const cleanupComplete = window.electronAPI?.onCountdownComplete(() => {
+      setShowCountdown(false);
+      toggleRecording();
+    });
+
+    const cleanupCancelled = window.electronAPI?.onCountdownCancelled(() => {
+      setShowCountdown(false);
+    });
+
+    return () => {
+      if (cleanupComplete) cleanupComplete();
+      if (cleanupCancelled) cleanupCancelled();
+    };
+  }, [toggleRecording]);
 
   useEffect(() => {
     const checkSelectedSource = async () => {
@@ -261,8 +294,8 @@ export function LaunchWindow() {
         <Button
           variant="link"
           size="sm"
-          onClick={hasSelectedSource ? toggleRecording : openSourceSelector}
-          disabled={!hasSelectedSource && !recording}
+          onClick={handleRecordClick}
+          disabled={(!hasSelectedSource && !recording) || showCountdown}
           className={`gap-1 text-white bg-transparent hover:bg-transparent px-0 flex-1 text-center text-xs ${styles.electronNoDrag}`}
         >
           {recording ? (
