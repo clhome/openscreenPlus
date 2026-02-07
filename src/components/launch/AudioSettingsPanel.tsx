@@ -19,15 +19,20 @@ export function AudioSettingsPanel({
   anchorRef
 }: AudioSettingsPanelProps) {
   useTranslation(); // 保留以备将来使用
-  const [position, setPosition] = useState({ top: 0, left: 0 });
+  const [position, setPosition] = useState({ top: 0, left: 0, isAbove: true });
 
   // 计算面板位置
   useEffect(() => {
     if (isOpen && anchorRef?.current) {
       const rect = anchorRef.current.getBoundingClientRect();
+      const spaceAbove = rect.top;
+      // 如果上方空间不足（小于200px），则显示在下方
+      const isAbove = spaceAbove > 200;
+      
       setPosition({
-        top: rect.top - 10,
+        top: isAbove ? rect.top - 10 : rect.bottom + 10,
         left: rect.left + rect.width / 2,
+        isAbove
       });
     }
   }, [isOpen, anchorRef]);
@@ -68,7 +73,7 @@ export function AudioSettingsPanel({
       style={{
         top: position.top,
         left: position.left,
-        transform: 'translate(-50%, -100%)',
+        transform: `translate(-50%, ${position.isAbove ? '-100%' : '0'})`,
         background: 'linear-gradient(135deg, rgba(30,30,40,0.95) 0%, rgba(20,20,30,0.92) 100%)',
         backdropFilter: 'blur(32px) saturate(180%)',
         WebkitBackdropFilter: 'blur(32px) saturate(180%)',

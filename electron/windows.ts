@@ -37,7 +37,7 @@ export function createHudOverlayWindow(): BrowserWindowType {
 
   // 窗口高度需要足够容纳工具栏和向上弹出的面板
   const windowWidth = 500;
-  const windowHeight = 50; // 350px 高度，工具栏在中下部，上方留出空间给弹出面板
+  const windowHeight = 150; // 350px 高度，工具栏在中下部，上方留出空间给弹出面板
 
   const x = Math.floor(workArea.x + (workArea.width - windowWidth) / 2);
   // 窗口底部距离屏幕底部 60px，这样工具栏看起来在屏幕底部附近

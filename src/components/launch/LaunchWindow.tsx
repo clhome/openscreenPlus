@@ -385,7 +385,7 @@ export function LaunchWindow() {
       </div>
 
       {/* 初次使用帮助 */}
-      <FirstTimeHelp />
+      {/* <FirstTimeHelp /> */}
     </div>
   );
 }
