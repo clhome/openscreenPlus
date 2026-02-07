@@ -5,7 +5,7 @@ import { useScreenRecorder } from "../../hooks/useScreenRecorder";
 import { useAudioDevices, type AudioMode } from "../../hooks/useAudioDevices";
 import { AudioSettingsPanel } from "./AudioSettingsPanel";
 import { MicIndicator } from "./MicIndicator";
-import { FirstTimeHelp } from "./FirstTimeHelp";
+// import { FirstTimeHelp } from "./FirstTimeHelp";
 import { Button } from "../ui/button";
 import { BsRecordCircle, BsPauseFill, BsPlayFill } from "react-icons/bs";
 import { FaRegStopCircle } from "react-icons/fa";
