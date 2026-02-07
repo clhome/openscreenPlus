@@ -39,7 +39,7 @@
 
 ### Windows
 
-下载 `OpenScreen-Chinese-x.x.x-Setup.exe`，双击安装即可。
+下载 `OpenScreenPlus-x.x.x-Setup.exe`，双击安装即可。
 
 ### macOS
 
@@ -115,8 +115,12 @@
 ### 3. 导出视频
 
 1. 点击"导出"按钮
+
 2. 选择导出质量和方法
+
 3. 等待导出完成
+
+   默认按原始时间的两倍速导出，速度再高会产生丢帧
 
 ---
 

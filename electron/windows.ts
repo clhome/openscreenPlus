@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 
 const require = createRequire(import.meta.url)
 const electronModule = require('electron')
-const { BrowserWindow: BrowserWindowConstructor, screen, ipcMain } = electronModule
+const { BrowserWindow: BrowserWindowConstructor, screen, ipcMain, nativeImage } = electronModule
 const BrowserWindow = BrowserWindowConstructor
 
 
@@ -14,6 +14,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const APP_ROOT = path.join(__dirname, '..')
 const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL']
 const RENDERER_DIST = path.join(APP_ROOT, 'dist')
+const ICON_PATH = path.join(APP_ROOT, 'icons/icons/png/256x256.png')
 
 let hudOverlayWindow: BrowserWindowType | null = null;
 
@@ -57,6 +58,7 @@ export function createHudOverlayWindow(): BrowserWindowType {
     alwaysOnTop: true,
     skipTaskbar: true,
     hasShadow: false,
+    icon: nativeImage.createFromPath(ICON_PATH),
     webPreferences: {
       preload: path.join(__dirname, 'preload.mjs'),
       nodeIntegration: false,
@@ -125,6 +127,7 @@ export function createEditorWindow(): BrowserWindowType {
     skipTaskbar: false,
     title: 'OpenScreenPlus',
     backgroundColor: '#09090b',
+    icon: nativeImage.createFromPath(ICON_PATH),
     webPreferences: {
       preload: path.join(__dirname, 'preload.mjs'),
       nodeIntegration: false,
@@ -167,6 +170,7 @@ export function createSourceSelectorWindow(): BrowserWindowType {
     alwaysOnTop: true,
     transparent: true,
     backgroundColor: '#00000000',
+    icon: nativeImage.createFromPath(ICON_PATH),
     webPreferences: {
       preload: path.join(__dirname, 'preload.mjs'),
       nodeIntegration: false,
