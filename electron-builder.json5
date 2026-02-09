@@ -5,6 +5,13 @@
     output: "release",
   },
   files: ["dist", "dist-electron", "package.json"],
+  extraResources: [
+    {
+      from: "public/wallpapers",
+      to: "wallpapers",
+      filter: ["**/*"],
+    },
+  ],
   win: {
     icon: "icons/icons/win/icon.ico",
     target: [

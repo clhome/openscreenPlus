@@ -264,12 +264,18 @@ export function registerIpcHandlers(
   })
 
   // Return base path for assets so renderer can resolve file:// paths in production
+  // In production, extraResources copies public/wallpapers to resources/wallpapers
+  // So we return resourcesPath directly (wallpapers will be at resourcesPath/wallpapers/...)
   ipcMain.handle('get-asset-base-path', () => {
     try {
       if (app.isPackaged) {
-        return path.join(process.resourcesPath, 'assets')
+        // In production, resources are in process.resourcesPath
+        // e.g., wallpapers are at resources/wallpapers/wallpaper1.jpg
+        return process.resourcesPath
       }
-      return path.join(app.getAppPath(), 'public', 'assets')
+      // In development, resources are served from public/ directory
+      // e.g., wallpapers are at public/wallpapers/wallpaper1.jpg
+      return path.join(app.getAppPath(), 'public')
     } catch (err) {
       console.error('Failed to resolve asset base path:', err)
       return null
