@@ -291,6 +291,41 @@ export function LaunchWindow() {
 
         <div className="w-px h-6 bg-white/30" />
 
+        {/* 暂停按钮 - 仅在录制时显示 */}
+        {recording && (
+          <>
+            <Button
+              variant="link"
+              size="sm"
+              onClick={togglePause}
+              className={`gap-1 text-white bg-transparent hover:bg-transparent px-2 text-center text-xs ${styles.electronNoDrag}`}
+              title={paused ? t('recording.resume') : t('recording.pause')}
+            >
+              {paused ? (
+                <BsPlayFill size={16} className="text-green-400" />
+              ) : (
+                <BsPauseFill size={16} className="text-yellow-400" />
+              )}
+            </Button>
+            <div className="w-px h-6 bg-white/30" />
+          </>
+        )}
+
+        {/* 麦克风状态指示器 - 仅在录制时显示，在暂停和停止之间 */}
+        {recording && (audioMode === 'mic' || audioMode === 'both') && (
+          <>
+            <div className={`px-1 ${styles.electronNoDrag}`}>
+              <MicIndicator
+                isRecording={recording}
+                hasMic={audioMode === 'mic' || audioMode === 'both'}
+                micDeviceId={selectedMicDevice?.deviceId}
+                size="sm"
+              />
+            </div>
+            <div className="w-px h-6 bg-white/30" />
+          </>
+        )}
+
         <Button
           variant="link"
           size="sm"
@@ -310,41 +345,6 @@ export function LaunchWindow() {
             </>
           )}
         </Button>
-
-        {/* 麦克风状态指示器 - 仅在录制时显示 */}
-        {recording && (audioMode === 'mic' || audioMode === 'both') && (
-          <>
-            <div className="w-px h-6 bg-white/30" />
-            <div className={`px-1 ${styles.electronNoDrag}`}>
-              <MicIndicator
-                isRecording={recording}
-                hasMic={audioMode === 'mic' || audioMode === 'both'}
-                micDeviceId={selectedMicDevice?.deviceId}
-                size="sm"
-              />
-            </div>
-          </>
-        )}
-
-        {/* 暂停按钮 - 仅在录制时显示 */}
-        {recording && (
-          <>
-            <div className="w-px h-6 bg-white/30" />
-            <Button
-              variant="link"
-              size="sm"
-              onClick={togglePause}
-              className={`gap-1 text-white bg-transparent hover:bg-transparent px-0 text-center text-xs ${styles.electronNoDrag}`}
-              title={paused ? t('recording.resume') : t('recording.pause')}
-            >
-              {paused ? (
-                <BsPlayFill size={16} className="text-green-400" />
-              ) : (
-                <BsPauseFill size={16} className="text-yellow-400" />
-              )}
-            </Button>
-          </>
-        )}
 
         <div className="w-px h-6 bg-white/30" />
 

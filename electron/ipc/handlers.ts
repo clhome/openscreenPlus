@@ -133,14 +133,12 @@ export function registerIpcHandlers(
       onRecordingStateChange(recording, source.name)
     }
 
-    // 录屏开始时隐藏窗口，停止时恢复
+    // 录屏期间保持控制条窗口可见，用户可以在控制条中直接停止录制
+    // 不再隐藏窗口，同时也支持通过托盘图标停止录制
     const mainWin = getMainWindow()
     if (mainWin && !mainWin.isDestroyed()) {
-      if (recording) {
-        // 录屏开始，隐藏窗口到系统托盘
-        mainWin.hide()
-      }
-      // 注意：停止录制后窗口会在 onRecordingStateChange 回调中恢复
+      // 录制期间和停止后都保持窗口可见
+      // 用户可以选择通过控制条或托盘图标来停止录制
     }
 
     // 鼠标位置追踪
