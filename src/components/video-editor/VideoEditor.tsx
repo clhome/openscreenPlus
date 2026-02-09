@@ -11,6 +11,7 @@ import PlaybackControls from "./PlaybackControls";
 import TimelineEditor from "./timeline/TimelineEditor";
 import { SettingsPanel } from "./SettingsPanel";
 import { ExportDialog } from "./ExportDialog";
+import { FaGithub } from "react-icons/fa";
 
 import type { Span } from "dnd-timeline";
 import {
@@ -730,6 +731,14 @@ export default function VideoEditor() {
         style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
       >
         <div className="flex-1" />
+        <div
+          className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
+          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
+          onClick={() => window.electronAPI.openExternalUrl('https://github.com/clhome/openscreenPlus')}
+        >
+          <FaGithub className="text-yellow-400 animate-golden-flash" size={18} />
+          <span className="text-sm font-medium text-slate-400 hover:text-white transition-colors">clhome/openscreenPlus</span>
+        </div>
       </div>
 
       <div className="flex-1 p-5 gap-4 flex min-h-0 relative overflow-hidden">

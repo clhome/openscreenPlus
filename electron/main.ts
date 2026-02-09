@@ -213,6 +213,7 @@ let mainWindow: BrowserWindowType | null = null
 let sourceSelectorWindow: BrowserWindowType | null = null
 let tray: TrayType | null = null
 let selectedSourceName = ''
+let isAppQuitting = false
 
 // Tray Icons
 const defaultTrayIcon = getTrayIcon('openscreen.png');
@@ -293,6 +294,14 @@ function createEditorWindowWrapper() {
     mainWindow = null
   }
   mainWindow = createEditorWindow()
+
+  // 当编辑窗口关闭时，重新显示录制窗口（HUD）
+  mainWindow.on('closed', () => {
+    mainWindow = null
+    if (!isAppQuitting) {
+      createWindow()
+    }
+  })
 }
 
 function createSourceSelectorWindowWrapper() {
@@ -307,6 +316,10 @@ function createSourceSelectorWindowWrapper() {
 // explicitly with Cmd + Q.
 app.on('window-all-closed', () => {
   // Keep app running (macOS behavior)
+})
+
+app.on('before-quit', () => {
+  isAppQuitting = true
 })
 
 app.on('activate', () => {
@@ -421,7 +434,7 @@ app.whenReady().then(async () => {
   });
 
   // 设置权限检查处理器
-  session.defaultSession.setPermissionCheckHandler((_webContents, permission, _requestingOrigin, _details) => {
+  session.defaultSession.setPermissionCheckHandler((_webContents, permission) => {
     const allowedPermissions = ['media', 'mediaKeySystem', 'audioCapture', 'display-capture'];
     if (allowedPermissions.includes(permission)) {
       return true;
