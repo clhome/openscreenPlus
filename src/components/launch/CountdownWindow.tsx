@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 
-const COUNTDOWN_SECONDS = 5;
+const COUNTDOWN_SECONDS = 3;
 
 export function CountdownWindow() {
   const { t } = useTranslation();

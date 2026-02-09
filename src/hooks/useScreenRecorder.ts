@@ -37,6 +37,8 @@ export function useScreenRecorder(
     selectedMicDeviceIdRef.current = selectedMicDeviceId;
   }, [selectedMicDeviceId]);
 
+  const auxiliaryTracks = useRef<MediaStreamTrack[]>([]);
+
   // Target visually lossless 4K @ 60fps; fall back gracefully when hardware cannot keep up
   const TARGET_FRAME_RATE = 60;
   const TARGET_WIDTH = 3840;
@@ -76,6 +78,10 @@ export function useScreenRecorder(
       if (stream.current) {
         stream.current.getTracks().forEach(track => track.stop());
       }
+      // 停止所有辅助轨道（如静音模式下的 dummy audio）
+      auxiliaryTracks.current.forEach(track => track.stop());
+      auxiliaryTracks.current = [];
+
       mediaRecorder.current.stop();
       setRecording(false);
       setPaused(false);
@@ -133,6 +139,8 @@ export function useScreenRecorder(
         stream.current.getTracks().forEach(track => track.stop());
         stream.current = null;
       }
+      auxiliaryTracks.current.forEach(track => track.stop());
+      auxiliaryTracks.current = [];
       if (audioCtxRef.current) {
         audioCtxRef.current.close();
         audioCtxRef.current = null;
@@ -142,6 +150,10 @@ export function useScreenRecorder(
 
   const startRecording = async () => {
     try {
+      // 增加短暂延迟，确保倒计时窗口完全关闭，且窗口状态稳定
+      // 这可以减少 WGC 在窗口切换时的初始化错误
+      await new Promise(resolve => setTimeout(resolve, 500));
+
       const selectedSource = await window.electronAPI.getSelectedSource();
       if (!selectedSource) {
         showWarning('请先选择录制源', '请在开始录制前选择要录制的屏幕或窗口');
@@ -243,11 +255,18 @@ export function useScreenRecorder(
             },
           });
 
-          // 只保留视频轨道，丢弃音频轨道（静音模式不需要音频）
+          // 只保留视频轨道
           tracks.push(...combinedStream.getVideoTracks());
-          // 停止音频轨道以释放资源
-          combinedStream.getAudioTracks().forEach((track: MediaStreamTrack) => track.stop());
+          
+          // CRITICAL FIX: 不要立即停止音频轨道
+          // 停止音频轨道可能会导致 WGC 会话在某些系统上崩溃 (Error -2147024809 / -2147467259)
+          // 相反，我们将它们静音并保存在辅助列表中，等录制结束时再清理
+          combinedStream.getAudioTracks().forEach((track: MediaStreamTrack) => {
+            track.enabled = false;
+            auxiliaryTracks.current.push(track);
+          });
         } catch (combinedError) {
+          console.warn('System audio workaround failed, trying dummy mic...', combinedError);
           // 如果带系统音频的请求失败，尝试使用麦克风作为“虚拟”音频源
           // 这样可以满足 WGC 对音频轨道的需求，避免 -2147024809 错误
           try {
@@ -264,11 +283,15 @@ export function useScreenRecorder(
               },
             });
 
-            // 只保留视频轨道，丢弃音频轨道
+            // 只保留视频轨道
             tracks.push(...dummyMicStream.getVideoTracks());
-            // 立即停止音频轨道，避免录制声音或占用设备
-            dummyMicStream.getAudioTracks().forEach((track: MediaStreamTrack) => track.stop());
+            // 麦克风是独立设备，停止它通常不会影响 WGC，但为了安全起见也静音保留
+            dummyMicStream.getAudioTracks().forEach((track: MediaStreamTrack) => {
+              track.enabled = false;
+              auxiliaryTracks.current.push(track);
+            });
           } catch (dummyMicError) {
+            console.warn('Dummy mic workaround failed, falling back to video only...', dummyMicError);
             // 如果连麦克风请求也失败（例如无麦克风权限），只能使用无音频的请求作为最后后备
             // 这可能会在控制台产生 WGC 错误日志，但通常能成功开始视频录制
             const videoStream = await (navigator.mediaDevices as any).getUserMedia({
