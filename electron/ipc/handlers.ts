@@ -23,6 +23,10 @@ export function registerIpcHandlers(
   onRecordingStateChange?: (recording: boolean, sourceName: string) => void
 ) {
   ipcMain.handle('get-sources', async (_: unknown, opts: Electron.SourcesOptions) => {
+    // desktopCapturer.getSources 底层使用 WGC (Windows Graphics Capture) 获取缩略图
+    // 在遍历某些特殊窗口（如最小化、受保护或 0x0 大小的窗口）时，可能会在控制台产生
+    // "ERROR:wgc_capturer_win.cc ... Failed to start capture" 错误日志。
+    // 这是 Electron/Chromium 底层的已知行为，不影响功能，可以忽略。
     const sources = await desktopCapturer.getSources(opts)
     return sources.map((source: any) => ({
       id: source.id,

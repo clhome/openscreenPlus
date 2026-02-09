@@ -319,6 +319,10 @@ app.on('activate', () => {
 
 
 
+// 抑制 Chromium WGC (Windows Graphics Capture) 相关的底层日志
+// 这些日志在静音模式录屏时会出现，但不影响功能
+app.commandLine.appendSwitch('log-level', '3');  // 0=INFO, 1=WARNING, 2=LOG, 3=ERROR (只显示致命错误)
+
 // 单实例模式：使用 Electron 原生的单实例锁机制
 const gotTheLock = app.requestSingleInstanceLock()
 

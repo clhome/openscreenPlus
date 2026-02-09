@@ -175,7 +175,6 @@ export function useScreenRecorder(
                 maxWidth: TARGET_WIDTH,
                 maxHeight: TARGET_HEIGHT,
                 maxFrameRate: TARGET_FRAME_RATE,
-                minFrameRate: 30,
               },
             },
           });
@@ -195,7 +194,6 @@ export function useScreenRecorder(
                 maxWidth: TARGET_WIDTH,
                 maxHeight: TARGET_HEIGHT,
                 maxFrameRate: TARGET_FRAME_RATE,
-                minFrameRate: 30,
               },
             },
           });
@@ -222,21 +220,72 @@ export function useScreenRecorder(
           }
         }
       } else {
-        // 只获取视频，不需要系统音频
-        const videoStream = await (navigator.mediaDevices as any).getUserMedia({
-          audio: false,
-          video: {
-            mandatory: {
-              chromeMediaSource: "desktop",
-              chromeMediaSourceId: selectedSource.id,
-              maxWidth: TARGET_WIDTH,
-              maxHeight: TARGET_HEIGHT,
-              maxFrameRate: TARGET_FRAME_RATE,
-              minFrameRate: 30,
+        // 静音模式：即使不需要系统音频，也请求带音频的媒体流
+        // 这是一个针对 Windows Graphics Capture (WGC) API 的 workaround
+        // WGC 在 audio:false 时可能会失败（错误代码 -2147024809）
+        // 请求带音频的流后，我们会丢弃音频轨道
+        try {
+          const combinedStream = await (navigator.mediaDevices as any).getUserMedia({
+            audio: {
+              mandatory: {
+                chromeMediaSource: "desktop",
+                chromeMediaSourceId: selectedSource.id,
+              },
             },
-          },
-        });
-        tracks.push(...videoStream.getVideoTracks());
+            video: {
+              mandatory: {
+                chromeMediaSource: "desktop",
+                chromeMediaSourceId: selectedSource.id,
+                maxWidth: TARGET_WIDTH,
+                maxHeight: TARGET_HEIGHT,
+                maxFrameRate: TARGET_FRAME_RATE,
+              },
+            },
+          });
+
+          // 只保留视频轨道，丢弃音频轨道（静音模式不需要音频）
+          tracks.push(...combinedStream.getVideoTracks());
+          // 停止音频轨道以释放资源
+          combinedStream.getAudioTracks().forEach((track: MediaStreamTrack) => track.stop());
+        } catch (combinedError) {
+          // 如果带系统音频的请求失败，尝试使用麦克风作为“虚拟”音频源
+          // 这样可以满足 WGC 对音频轨道的需求，避免 -2147024809 错误
+          try {
+            const dummyMicStream = await (navigator.mediaDevices as any).getUserMedia({
+              audio: true, // 请求默认麦克风
+              video: {
+                mandatory: {
+                  chromeMediaSource: "desktop",
+                  chromeMediaSourceId: selectedSource.id,
+                  maxWidth: TARGET_WIDTH,
+                  maxHeight: TARGET_HEIGHT,
+                  maxFrameRate: TARGET_FRAME_RATE,
+                },
+              },
+            });
+
+            // 只保留视频轨道，丢弃音频轨道
+            tracks.push(...dummyMicStream.getVideoTracks());
+            // 立即停止音频轨道，避免录制声音或占用设备
+            dummyMicStream.getAudioTracks().forEach((track: MediaStreamTrack) => track.stop());
+          } catch (dummyMicError) {
+            // 如果连麦克风请求也失败（例如无麦克风权限），只能使用无音频的请求作为最后后备
+            // 这可能会在控制台产生 WGC 错误日志，但通常能成功开始视频录制
+            const videoStream = await (navigator.mediaDevices as any).getUserMedia({
+              audio: false,
+              video: {
+                mandatory: {
+                  chromeMediaSource: "desktop",
+                  chromeMediaSourceId: selectedSource.id,
+                  maxWidth: TARGET_WIDTH,
+                  maxHeight: TARGET_HEIGHT,
+                  maxFrameRate: TARGET_FRAME_RATE,
+                },
+              },
+            });
+            tracks.push(...videoStream.getVideoTracks());
+          }
+        }
       }
 
 
