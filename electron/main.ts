@@ -333,31 +333,9 @@ app.on('activate', () => {
 
 
 // 抑制 Chromium WGC (Windows Graphics Capture) 相关的底层日志
-// 这些日志在静音模式录屏时会出现，但不影响功能
-// ProcessFrame failed, using existing frame: -2147467259 是 WGC API 在帧获取失败时的正常回退行为
-// 
-// 这些错误来自 Chromium 的 WGC 实现:
-// - wgc_capture_session.cc 中的 ProcessFrame 方法
-// - 错误码 -2147467259 (0x80004005 = E_FAIL) 表示帧获取失败
-// - Chromium 会自动使用上一帧作为替代，因此不影响录制质量
-app.commandLine.appendSwitch('log-level', '3');  // 0=INFO, 1=WARNING, 2=LOG, 3=ERROR (只显示致命错误)
-app.commandLine.appendSwitch('disable-logging');  // 禁用 Chromium 日志输出
-app.commandLine.appendSwitch('v', '0');  // 设置 verbose 级别为 0（最低）
-
-// 过滤 stderr 中的 WGC 错误信息
-// 这些错误是无害的，Chromium 会自动处理，无需显示给用户
-const originalStderrWrite = process.stderr.write.bind(process.stderr);
-process.stderr.write = (chunk: string | Uint8Array, encodingOrCb?: BufferEncoding | ((err?: Error | null) => void), cb?: (err?: Error | null) => void): boolean => {
-  const str = typeof chunk === 'string' ? chunk : chunk.toString();
-  // 过滤 WGC 相关的 ProcessFrame 错误
-  if (str.includes('wgc_capture_session') || str.includes('ProcessFrame failed')) {
-    return true;  // 假装写入成功，但实际不输出
-  }
-  if (typeof encodingOrCb === 'function') {
-    return originalStderrWrite(chunk, encodingOrCb);
-  }
-  return originalStderrWrite(chunk, encodingOrCb, cb);
-};
+// These logs (ProcessFrame failed) are benign WGC fallbacks when frame is dropped.
+// Set log level to 3 (FATAL) to suppress ERROR level logs from native modules.
+app.commandLine.appendSwitch('log-level', '3');
 
 // 单实例模式：使用 Electron 原生的单实例锁机制
 const gotTheLock = app.requestSingleInstanceLock()

@@ -187,6 +187,7 @@ export function useScreenRecorder(
                 maxWidth: TARGET_WIDTH,
                 maxHeight: TARGET_HEIGHT,
                 maxFrameRate: TARGET_FRAME_RATE,
+                // minFrameRate: 30  // 音频录制会闪烁
               },
             },
           });
@@ -206,6 +207,7 @@ export function useScreenRecorder(
                 maxWidth: TARGET_WIDTH,
                 maxHeight: TARGET_HEIGHT,
                 maxFrameRate: TARGET_FRAME_RATE,
+                // minFrameRate: 30
               },
             },
           });
@@ -251,6 +253,7 @@ export function useScreenRecorder(
                 maxWidth: TARGET_WIDTH,
                 maxHeight: TARGET_HEIGHT,
                 maxFrameRate: TARGET_FRAME_RATE,
+                // minFrameRate: 30
               },
             },
           });
@@ -279,6 +282,7 @@ export function useScreenRecorder(
                   maxWidth: TARGET_WIDTH,
                   maxHeight: TARGET_HEIGHT,
                   maxFrameRate: TARGET_FRAME_RATE,
+                  // minFrameRate: 30
                 },
               },
             });
@@ -303,6 +307,7 @@ export function useScreenRecorder(
                   maxWidth: TARGET_WIDTH,
                   maxHeight: TARGET_HEIGHT,
                   maxFrameRate: TARGET_FRAME_RATE,
+                  // minFrameRate: 30 // 录音会闪烁
                 },
               },
             });
