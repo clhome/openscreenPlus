@@ -190,8 +190,6 @@ On first run, Windows Defender may prompt "Windows protected your PC". Click "Mo
 - **Timeline**: dnd-timeline
 - **Internationalization**: i18next
 
-<p align="center">Scan code to join WeChat group for updates and support</p>
-
 ---
 
 ## 🙏 Acknowledgements

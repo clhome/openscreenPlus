@@ -200,7 +200,6 @@ chmod +x Openscreen-Linux-*.AppImage
 
 - **国际化**: i18next
 
-<p align="center">扫码加入微信交流群，获取最新更新和技术支持</p>
 
 ---
 
