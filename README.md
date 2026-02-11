@@ -1,17 +1,18 @@
-@ -1,219 +0,0 @@
-
 <p align="center">
   <img src="openscreen.png" alt="OpenScreen Logo" width="64" />
 </p>
 
-# <p align="center">`OpenScreenPLUS `</p>
+# <p align="center">`OpenScreenPLUS`</p>
 
-<p align="center"><strong>免费开源的屏幕录制和视频编辑工具，Screen Studio 的开源替代品</strong></p>
+<p align="center"><strong>Free and open-source screen recording and video editing tool, an open-source alternative to Screen Studio</strong></p>
 
 <p align="center">
-  🌟 本项目基于 <a href="https://github.com/siddharthvaddem/openscreen">siddharthvaddem/openscreen</a> 和<a href="https://github.com/yzz05220-rgb/openscreen-chinese">yzz05220-rgb/openscreen-chinese</a>进行二开
+  [<a href="./README中文.md">中文</a>] | [<a href="./README.md">English</a>]
 </p>
 
+<p align="center">
+  🌟 This project is a secondary development based on <a href="https://github.com/siddharthvaddem/openscreen">siddharthvaddem/openscreen</a> and <a href="https://github.com/yzz05220-rgb/openscreen-chinese">yzz05220-rgb/openscreen-chinese</a>.
+</p>
 
 <p align="center">
   <a href="https://github.com/clhome/openscreenPlus/releases">
@@ -25,62 +26,61 @@
   </a>
 </p>
 
+---
+
+## ✨ Internationalization
+
+Automatically matches Chinese or English based on the system language.
 
 ---
 
-## ✨ 国际化功能
+## 📥 Download & Install
 
-自动根据本机语言匹配中英文
-
----
-
-## 📥 下载安装
-
-从 [Releases](https://github.com/yzz05220-rgb/openscreen-chinese/releases) 页面下载最新版本的安装包。
+Download the latest installer from the [Releases](https://github.com/yzz05220-rgb/openscreen-chinese/releases) page.
 
 ### Windows
 
-下载 `OpenScreenPlus-x.x.x-Setup.exe`，双击安装即可。
+Download `OpenScreenPlus-x.x.x-Setup.exe` and double-click to install.
 
 ### macOS
 
-下载 `.dmg` 文件，拖拽到应用程序文件夹。
+Download the `.dmg` file and drag it to your Applications folder.
 
 ### Linux
 
-下载 `.AppImage` 文件，添加执行权限后运行。
+Download the `.AppImage` file, add execution permissions, and run it.
 
 ---
 
-## 🎯 核心功能
+## 🎯 Core Features
 
-### 📹 录制功能
+### 📹 Recording
 
-- ✅ 录制整个屏幕或特定应用窗口
-- ✅ 多种音频录制模式（静音/系统/麦克/全部）
-- ✅ 自动检测音频设备
-- ✅ 录制中随时可以暂停
-- ✅ 录制前有3秒倒计时，更加从容
+- ✅ Record the entire screen or specific application windows
+- ✅ Multiple audio recording modes (Mute / System / Mic / All)
+- ✅ Auto-detect audio devices
+- ✅ Pause at any time during recording
+- ✅ 3-second countdown before recording
 
-### 🎬 编辑功能
+### 🎬 Editing
 
-- ✅ 添加手动缩放（可自定义缩放深度）
-- ✅ 自定义缩放的持续时间和位置
-- ✅ 裁剪视频录制以隐藏部分内容
-- ✅ 修剪视频片段
+- ✅ Add manual zoom (customizable zoom depth)
+- ✅ Customize zoom duration and position
+- ✅ Crop video recordings to hide content
+- ✅ Trim video segments
 
-### 🎨 视觉效果
+### 🎨 Visual Effects
 
-- ✅ 选择壁纸、纯色、渐变或自定义图片作为背景
-- ✅ 运动模糊效果，使平移和缩放更流畅
-- ✅ 添加注释（文字、箭头、图片）
-- ✅ 自定义圆角、阴影、边距
+- ✅ Choose wallpapers, solid colors, gradients, or custom images for backgrounds
+- ✅ Motion blur effects for smoother panning and zooming
+- ✅ Add annotations (Text, Arrows, Images)
+- ✅ Customize corners, shadows, and margins
 
-### 📤 导出功能
+### 📤 Exporting
 
-- ✅ 导出不同宽高比和分辨率
-- ✅ 多种质量选项
-- ✅ 浏览器渲染或 FFmpeg 快速导出
+- ✅ Export in different aspect ratios and resolutions
+- ✅ Multiple quality options
+- ✅ Browser rendering or FFmpeg fast export
 
 <p align="center">
   <img src="preview.jpg" alt="OpenScreen App Preview" style="height: 320px; margin-right: 12px;" />
@@ -89,136 +89,120 @@
 <p align="center">
   <img src="preview3.jpg" alt="OpenScreen App Preview 3" style="height: 320px; margin-right: 12px;" />
   <img src="preview4.jpg" alt="OpenScreen App Preview 4" style="height: 640px; margin-right: 12px;" />
-  </p>
-
-
----
-
-## 🚀 快速开始
-
-### 1. 录制视频
-
-1. 启动应用后，点击"屏幕"选择录制源（整个屏幕或特定窗口）
-2. 点击"全部"选择音频模式：
-   - **静音** - 不录制任何音频
-   - **系统** - 只录制系统声音</p>
-   - **麦克** - 只录制麦克风
-   - **全部** - 同时录制系统声音和麦克风
-3. 点击"录制"开始录制
-4. 录制完成后点击"停止"
-
-### 2. 编辑视频
-
-1. 在编辑器中，使用时间轴添加缩放、裁剪、注释
-2. 使用 AI 智能缩放功能自动生成缩放建议
-3. 调整背景、运动模糊等视觉效果
-4. 预览效果
-
-### 3. 导出视频
-
-1. 点击"导出"按钮
-
-2. 选择导出质量和方法
-
-3. 等待导出完成
-
-   默认按原始时间的两倍速导出，速度再高会产生丢帧
+</p>
 
 ---
 
-## 🛠️ 从源码构建
+## 🚀 Quick Start
+
+### 1. Record Video
+
+1. Launch the app and click "Screen" to select the recording source (Entire Screen or Specific Window).
+2. Click "All" to select the audio mode:
+   - **Mute**: Do not record any audio
+   - **System**: Record system sound only
+   - **Mic**: Record microphone only
+   - **All**: Record both system sound and microphone
+3. Click "Record" to start recording.
+4. Click "Stop" when finished.
+
+### 2. Edit Video
+
+1. In the editor, use the timeline to add zooms, crops, or annotations.
+2. Use AI smart zoom to automatically generate zoom suggestions.
+3. Adjust backgrounds, motion blur, and other visual effects.
+4. Preview the results.
+
+### 3. Export Video
+
+1. Click the "Export" button.
+2. Select export quality and method.
+3. Wait for the export to complete.
+   - Defaults to 2x playback speed for export; higher speeds may cause frame drops.
+
+---
+
+## 🛠️ Build from Source
 
 ```bash
-# 克隆仓库
+# Clone the repository
 git clone https://github.com/clhome/openscreenPlus.git
 cd openscreenPlus
 
-
-# 安装依赖
+# Install dependencies
 npm install
-#安装失败可时设置镜像后再安装
+# If installation fails, set the registry mirror
 npm config set registry https://registry.npmmirror.com
 
-# 开发模式运行
+# Run in development mode
 npm run dev
 
-# 打包 Windows 版本
+# Build for Windows
 npm run build:win
 
-# 打包 macOS 版本
+# Build for macOS
 npm run build:mac
 
-# 打包 Linux 版本
+# Build for Linux
 npm run build:linux
 
-# 导出速度修改 默认2倍速导出
-openscreenPlus\src\lib\exporter\videoExporter.ts
-video.playbackRate = 2.0;
+# Modify export speed (defaults to 2.0)
+# File: openscreenPlus\src\lib\exporter\videoExporter.ts
+# video.playbackRate = 2.0;
 ```
 
 ---
 
-
-
-## 🔧 平台特定说明
+## 🔧 Platform Specific Notes
 
 ### macOS
 
-如果遇到 macOS Gatekeeper 阻止应用运行（因为没有开发者证书），可以在终端运行以下命令：
+If macOS Gatekeeper blocks the app (due to lack of developer certificate), run this command in terminal:
 
 ```bash
 xattr -rd com.apple.quarantine /Applications/Openscreen.app
 ```
 
-然后前往 **系统偏好设置 > 安全性与隐私**，授予"屏幕录制"和"辅助功能"权限。
+Then go to **System Preferences > Security & Privacy** and grant "Screen Recording" and "Accessibility" permissions.
 
 ### Linux
 
-从 Releases 页面下载 `.AppImage` 文件，然后：
+Download the `.AppImage` file from Releases, then:
 
 ```bash
 chmod +x Openscreen-Linux-*.AppImage
 ./Openscreen-Linux-*.AppImage
 ```
 
-根据桌面环境，可能需要授予屏幕录制权限。
+Depending on your desktop environment, you may need to grant screen recording permissions.
 
 ### Windows
 
-首次运行时，Windows Defender 可能会提示"Windows 已保护你的电脑"，点击"更多信息"然后"仍要运行"即可。
+On first run, Windows Defender may prompt "Windows protected your PC". Click "More info" and then "Run anyway".
 
 ---
 
-## 🏗️ 技术栈
+## 🏗️ Tech Stack
 
-- **框架**: Electron + React + TypeScript
+- **Framework**: Electron + React + TypeScript
+- **Build Tool**: Vite
+- **Graphics Rendering**: PixiJS
+- **Timeline**: dnd-timeline
+- **Internationalization**: i18next
 
-- **构建工具**: Vite
-
-- **图形渲染**: PixiJS
-
-- **时间轴**: dnd-timeline
-
-- **国际化**: i18next
-
-  
-
-
-<p align="center">扫码加入微信交流群，获取最新更新和技术支持</p>
+<p align="center">Scan code to join WeChat group for updates and support</p>
 
 ---
 
-## 🙏 致谢
+## 🙏 Acknowledgements
 
-本项目基于 [OpenScreen](https://github.com/siddharthvaddem/openscreen) 和[openscreen-chinese](https://github.com/yzz05220-rgb/openscreen-chinese)开发，感谢原作者 [@siddharthvaddem](https://github.com/siddharthvaddem)和[yzz05220-rgb](https://github.com/yzz05220-rgb) 的开源贡献！
-
-
+This project is based on [OpenScreen](https://github.com/siddharthvaddem/openscreen) and [openscreen-chinese](https://github.com/yzz05220-rgb/openscreen-chinese). Thanks to the original authors [@siddharthvaddem](https://github.com/siddharthvaddem) and [yzz05220-rgb](https://github.com/yzz05220-rgb) for their open-source contributions!
 
 ---
 
-## 📝 许可证
+## 📝 License
 
-本项目采用 [MIT License](./LICENSE) 开源许可证。
+This project is licensed under the [MIT License](./LICENSE).
 
 ---
 
