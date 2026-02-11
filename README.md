@@ -14,16 +14,17 @@
 
 
 <p align="center">
-  <a href="https://github.com/yzz05220-rgb/openscreen-chinese/releases">
-    <img src="https://img.shields.io/github/v/release/yzz05220-rgb/openscreen-chinese?style=flat-square" alt="Latest Release" />
+  <a href="https://github.com/clhome/openscreenPlus/releases">
+    <img src="https://img.shields.io/github/v/release/clhome/openscreenPlus?style=flat-square" alt="Latest Release" />
   </a>
-  <a href="https://github.com/yzz05220-rgb/openscreen-chinese/blob/main/LICENSE">
-    <img src="https://img.shields.io/github/license/yzz05220-rgb/openscreen-chinese?style=flat-square" alt="License" />
+  <a href="https://github.com/clhome/openscreenPlus/blob/main/LICENSE">
+    <img src="https://img.shields.io/github/license/clhome/openscreenPlus?style=flat-square" alt="License" />
   </a>
-  <a href="https://github.com/yzz05220-rgb/openscreen-chinese/stargazers">
-    <img src="https://img.shields.io/github/stars/yzz05220-rgb/openscreen-chinese?style=flat-square" alt="Stars" />
+  <a href="https://github.com/clhome/openscreenPlus/stargazers">
+    <img src="https://img.shields.io/github/stars/clhome/openscreenPlus?style=flat-square" alt="Stars" />
   </a>
 </p>
+
 
 ---
 
