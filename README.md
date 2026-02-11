@@ -28,6 +28,12 @@
 
 ---
 
+![](all.jpg)
+
+
+
+
+
 ## ✨ Internationalization
 
 Automatically matches Chinese or English based on the system language.
