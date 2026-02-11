@@ -58,13 +58,12 @@
 - ✅ 录制整个屏幕或特定应用窗口
 - ✅ 多种音频录制模式（静音/系统/麦克/全部）
 - ✅ 自动检测音频设备
-- ✅ 鼠标位置跟踪
+- ✅ 录制中随时可以暂停
+- ✅ 录制前有3秒倒计时，更加从容
 
 ### 🎬 编辑功能
 
 - ✅ 添加手动缩放（可自定义缩放深度）
-- ✅ AI 智能缩放建议
-- ✅ 鼠标跟随缩放
 - ✅ 自定义缩放的持续时间和位置
 - ✅ 裁剪视频录制以隐藏部分内容
 - ✅ 修剪视频片段
@@ -83,11 +82,14 @@
 - ✅ 浏览器渲染或 FFmpeg 快速导出
 
 <p align="center">
-  <img src="preview.png" alt="OpenScreen App Preview" style="height: 320px; margin-right: 12px;" />
-  <img src="preview2.png" alt="OpenScreen App Preview 2" style="height: 320px; margin-right: 12px;" />
-  <img src="preview3.png" alt="OpenScreen App Preview 3" style="height: 320px; margin-right: 12px;" />
-  <img src="preview4.png" alt="OpenScreen App Preview 4" style="height: 320px; margin-right: 12px;" />
+  <img src="preview.jpg" alt="OpenScreen App Preview" style="height: 320px; margin-right: 12px;" />
+  <img src="preview2.jpg" alt="OpenScreen App Preview 2" style="height: 320px; margin-right: 12px;" />
 </p>
+<p align="center">
+  <img src="preview3.jpg" alt="OpenScreen App Preview 3" style="height: 320px; margin-right: 12px;" />
+  <img src="preview4.jpg" alt="OpenScreen App Preview 4" style="height: 640px; margin-right: 12px;" />
+  </p>
+
 
 ---
 
@@ -98,7 +100,7 @@
 1. 启动应用后，点击"屏幕"选择录制源（整个屏幕或特定窗口）
 2. 点击"全部"选择音频模式：
    - **静音** - 不录制任何音频
-   - **系统** - 只录制系统声音
+   - **系统** - 只录制系统声音</p>
    - **麦克** - 只录制麦克风
    - **全部** - 同时录制系统声音和麦克风
 3. 点击"录制"开始录制
@@ -127,8 +129,8 @@
 
 ```bash
 # 克隆仓库
-git clone https://github.com/yzz05220-rgb/openscreen-chinese.git
-cd openscreen-chinese
+git clone https://github.com/clhome/openscreenPlus.git
+cd openscreenPlus
 
 
 # 安装依赖
@@ -189,11 +191,16 @@ chmod +x Openscreen-Linux-*.AppImage
 ## 🏗️ 技术栈
 
 - **框架**: Electron + React + TypeScript
+
 - **构建工具**: Vite
+
 - **图形渲染**: PixiJS
+
 - **时间轴**: dnd-timeline
+
 - **国际化**: i18next
-- **AI 集成**: Google Gemini API
+
+  
 
 
 <p align="center">扫码加入微信交流群，获取最新更新和技术支持</p>
