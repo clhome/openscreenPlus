@@ -97,6 +97,7 @@
   <img src="preview4.jpg" alt="OpenScreen App Preview 4" style="height: 640px; margin-right: 12px;" />
   </p>
 
+![](export.gif)
 ---
 
 ## 🚀 快速开始

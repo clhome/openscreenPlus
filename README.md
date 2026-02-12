@@ -33,7 +33,6 @@
 
 
 
-
 ## ✨ Internationalization
 
 Automatically matches Chinese or English based on the system language.
@@ -98,6 +97,7 @@ Download the `.AppImage` file, add execution permissions, and run it.
 </p>
 
 ---
+![](export.gif)
 
 ## 🚀 Quick Start
 
