@@ -212,4 +212,6 @@ This project is licensed under the [MIT License](./LICENSE).
 
 ## 🌟 Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=/clhome/openscreenPlus&type=Date)](https://star-history.com/#yzz05220-rgb/openscreen-chinese&Date)
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=clhome/openscreenPlus&type=date&legend=top-left)](https://www.star-history.com/#clhome/openscreenPlus&type=date&legend=top-left)
