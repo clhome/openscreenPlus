@@ -222,4 +222,4 @@ chmod +x Openscreen-Linux-*.AppImage
 
 ## 🌟 Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=/clhome/openscreenPlus&type=Date)](https://star-history.com/#clhome/openscreenPlus&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=clhome/openscreenPlus&type=date&legend=top-left)](https://www.star-history.com/#clhome/openscreenPlus&type=date&legend=top-left)
