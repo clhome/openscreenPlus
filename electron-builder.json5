@@ -4,7 +4,13 @@
   directories: {
     output: "release",
   },
-  files: ["dist", "dist-electron", "package.json"],
+  asarUnpack: [
+    "node_modules/ffmpeg-static/ffmpeg",
+    "node_modules/ffmpeg-static/ffmpeg.exe",
+    "node_modules/ffmpeg-static/index.js",
+    "node_modules/ffmpeg-static/package.json"
+  ],
+  files: ["dist", "dist-electron", "package.json", "node_modules/ffmpeg-static/**/*"],
   extraResources: [
     {
       from: "public/wallpapers",

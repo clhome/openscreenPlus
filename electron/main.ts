@@ -7,6 +7,16 @@ import path from 'node:path'
 import fs from 'node:fs/promises'
 import { createHudOverlayWindow, createEditorWindow, createSourceSelectorWindow, createCountdownWindow } from './windows'
 import { registerIpcHandlers } from './ipc/handlers'
+import {
+  startExportSession,
+  pushFrameWithBackpressure,
+  finishExport,
+  cancelExport,
+  getExportStatus,
+  fastExport,
+  type StartExportOptions,
+  type FastExportOptions,
+} from './ffmpegExport'
 import { initAutoUpdater } from './updater'
 
 
@@ -441,6 +451,115 @@ app.whenReady().then(async () => {
       return true;
     }
     return false;
+  });
+
+  // ── 导出：启动 FFmpeg 会话 ────────────────────────────────────
+  ipcMain.handle('ffmpeg:start-export', async (_event, options: StartExportOptions) => {
+    try {
+      // 传入 onDone 回调，以便在导出结束时通知渲染进程
+      const startResult = await startExportSession({
+        ...options,
+        onDone: (result) => {
+          _event.sender.send('ffmpeg:export-done', result);
+        }
+      });
+      console.log('[Main] FFmpeg 导出启动成功:', startResult);
+      return { ok: true };
+    } catch (err: unknown) {
+      console.error('[Main] FFmpeg 导出启动失败:', err);
+      return { ok: false, error: (err as Error).message };
+    }
+  });
+
+  // ── 导出：推送一帧（带背压） ─────────────────────────────────
+  ipcMain.handle('ffmpeg:push-frame', async (_event, frameBuffer: ArrayBuffer) => {
+    try {
+      await pushFrameWithBackpressure(frameBuffer);
+      return { ok: true };
+    } catch (err: unknown) {
+      return { ok: false, error: (err as Error).message };
+    }
+  });
+
+  // ── 导出：结束导出 ────────────────────────────────────────────
+  ipcMain.handle('ffmpeg:finish-export', async () => {
+    try {
+      finishExport();
+      return { ok: true };
+    } catch (err: unknown) {
+      return { ok: false, error: (err as Error).message };
+    }
+  });
+
+  // ── 导出：取消导出 ────────────────────────────────────────────
+  ipcMain.handle('ffmpeg:cancel-export', async () => {
+    cancelExport();
+    return { ok: true };
+  });
+
+  // ── 导出：查询状态 ────────────────────────────────────────────
+  ipcMain.handle('ffmpeg:get-status', async () => {
+    return getExportStatus();
+  });
+
+  // ── 导出：纯 FFmpeg 快速导出（10-20x 速度）─────────────
+  ipcMain.handle('ffmpeg:fast-export', async (_event, options: FastExportOptions) => {
+    try {
+      const result = await fastExport({
+        ...options,
+        onProgress: (progress) => {
+          _event.sender.send('ffmpeg:export-progress', progress);
+        },
+        onDone: (result) => {
+          _event.sender.send('ffmpeg:export-done', result);
+        }
+      });
+      return result;
+    } catch (err: unknown) {
+      console.error('[Main] 快速导出失败:', err);
+      return { success: false, error: (err as Error).message };
+    }
+  });
+
+  // ── 导出：将导出的 FFmpeg 临时文件移动到最终位置 ───────────────
+  ipcMain.handle('ffmpeg:save-video', async (_event, tempPath: string, fileName: string) => {
+    try {
+      const { BrowserWindow, dialog } = require('electron');
+      const fsSync = require('node:fs');
+      const parentWindow = BrowserWindow.getFocusedWindow();
+      
+      // 检查临时文件是否存在
+      const absoluteTempPath = path.isAbsolute(tempPath) 
+        ? tempPath 
+        : path.join(process.cwd(), tempPath);
+
+      if (!fsSync.existsSync(absoluteTempPath)) {
+        return { success: false, message: '找不到临时导出文件' };
+      }
+
+      const result = await dialog.showSaveDialog(parentWindow!, {
+        title: 'Save Exported Video',
+        defaultPath: path.join(app.getPath('downloads'), fileName),
+        filters: [
+          { name: 'MP4 Video', extensions: ['mp4'] }
+        ],
+        properties: ['createDirectory', 'showOverwriteConfirmation']
+      });
+
+      if (result.canceled || !result.filePath) {
+        return { success: false, cancelled: true };
+      }
+
+      // 移动/复制临时文件到目标路径
+      await fs.copyFile(absoluteTempPath, result.filePath);
+      // 删除临时文件
+      await fs.unlink(absoluteTempPath);
+
+      return { success: true, path: result.filePath };
+    } catch (err: unknown) {
+      console.error('[FFmpegSave] 移动文件失败:', err);
+      return { success: false, error: (err as Error).message };
+    }
   });
 
   createTray()

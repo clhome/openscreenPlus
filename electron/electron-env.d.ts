@@ -66,6 +66,43 @@ interface Window {
     onCountdownCancelled: (callback: () => void) => () => void;
     sendCountdownComplete: () => void;
     sendCountdownCancelled: () => void;
+    // FFmpeg 导出
+    ffmpegExport: {
+      start: (options: {
+        outputPath: string;
+        width: number;
+        height: number;
+        fps: number;
+        audioPath?: string;
+        crf?: number;
+        preset?: string;
+        useHwAccel?: boolean;
+      }) => Promise<{ ok: boolean; error?: string }>;
+      pushFrame: (frameBuffer: ArrayBuffer) => Promise<{ ok: boolean; error?: string }>;
+      finish: () => Promise<{ ok: boolean; error?: string }>;
+      cancel: () => Promise<{ ok: boolean }>;
+      onDone: (
+        callback: (result: { success: boolean; outputPath?: string; error?: string }) => void
+      ) => () => void;
+      saveVideo: (
+        tempPath: string,
+        fileName: string
+      ) => Promise<{ success: boolean; path?: string; cancelled?: boolean; error?: string }>;
+      fastExport: (options: {
+        inputPath: string;
+        outputPath: string;
+        width: number;
+        height: number;
+        fps: number;
+        padding?: number;
+        borderRadius?: number;
+        background?: string;
+        crf?: number;
+      }) => Promise<{ success: boolean; outputPath?: string; error?: string }>;
+      onProgress: (
+        callback: (progress: { percentage: number; speed: string }) => void
+      ) => () => void;
+    };
   }
 }
 

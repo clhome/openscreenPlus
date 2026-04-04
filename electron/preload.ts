@@ -125,4 +125,75 @@ contextBridge.exposeInMainWorld('electronAPI', {
   sendCountdownCancelled: () => {
     ipcRenderer.send('countdown-cancelled-from-window')
   },
+
+  // ── FFmpeg 高速导出 API ───────────────────────────────────
+  ffmpegExport: {
+    /**
+     * 启动 FFmpeg 导出会话
+     * @param options 导出参数（分辨率、帧率、输出路径等）
+     */
+    start: (options: {
+      outputPath: string;
+      width: number;
+      height: number;
+      fps: number;
+      audioPath?: string;
+      crf?: number;
+      preset?: string;
+      useHwAccel?: boolean;
+    }) => ipcRenderer.invoke('ffmpeg:start-export', options),
+
+    /**
+     * 推送一帧 raw RGBA 数据
+     * @param frameBuffer Canvas getImageData().data 的 ArrayBuffer
+     */
+    pushFrame: (frameBuffer: ArrayBuffer) =>
+      ipcRenderer.invoke('ffmpeg:push-frame', frameBuffer),
+
+    /**
+     * 通知 FFmpeg 所有帧已推送完毕，开始最终编码
+     */
+    finish: () => ipcRenderer.invoke('ffmpeg:finish-export'),
+
+    /**
+     * 取消当前导出任务
+     */
+    cancel: () => ipcRenderer.invoke('ffmpeg:cancel-export'),
+
+    /**
+     * 监听导出完成事件
+     * @param callback 回调函数，接收 { success, outputPath?, error? }
+     */
+    onDone: (callback: (result: { success: boolean; outputPath?: string; error?: string }) => void) => {
+      const listener = (_event: any, result: any) => callback(result);
+      ipcRenderer.on('ffmpeg:export-done', listener);
+      return () => ipcRenderer.removeListener('ffmpeg:export-done', listener);
+    },
+    saveVideo: (tempPath: string, fileName: string) =>
+      ipcRenderer.invoke('ffmpeg:save-video', tempPath, fileName),
+
+    /**
+     * 纯 FFmpeg 快速导出（10-20x 速度，不需要浏览器渲染）
+     */
+    fastExport: (options: {
+      inputPath: string;
+      outputPath: string;
+      width: number;
+      height: number;
+      fps: number;
+      padding?: number;
+      borderRadius?: number;
+      background?: string;
+      crf?: number;
+    }) => ipcRenderer.invoke('ffmpeg:fast-export', options),
+
+    /**
+     * 监听导出进度事件（快速导出使用）
+     */
+    onProgress: (callback: (progress: { percentage: number; speed: string }) => void) => {
+      const listener = (_event: any, progress: any) => callback(progress);
+      ipcRenderer.on('ffmpeg:export-progress', listener);
+      return () => ipcRenderer.removeListener('ffmpeg:export-progress', listener);
+    },
+  },
 })

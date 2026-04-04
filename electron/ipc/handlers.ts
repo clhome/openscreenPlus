@@ -6,6 +6,7 @@ import fs from 'node:fs/promises'
 import path from 'node:path'
 import { RECORDINGS_DIR } from '../main'
 import { uIOhook, UiohookMouseEvent } from 'uiohook-napi'
+import { remuxToMp4 } from '../ffmpegExport'
 
 let selectedSource: any = null
 let mouseTrackingInterval: NodeJS.Timeout | null = null
@@ -71,8 +72,28 @@ export function registerIpcHandlers(
 
   ipcMain.handle('store-recorded-video', async (_: unknown, videoData: ArrayBuffer, fileName: string) => {
     try {
-      const videoPath = path.join(RECORDINGS_DIR, fileName)
+      let videoPath = path.join(RECORDINGS_DIR, fileName)
       await fs.writeFile(videoPath, Buffer.from(videoData))
+
+      // 录制后闪电混流：将 webm 重建索引并无损转封装为带有 faststart 的 mp4，以极大提升编辑器寻址性能
+      if (fileName.endsWith('.webm')) {
+        const mp4FileName = fileName.replace(/\.webm$/, '.mp4')
+        const mp4Path = path.join(RECORDINGS_DIR, mp4FileName)
+        
+        try {
+          const remuxResult = await remuxToMp4(videoPath, mp4Path)
+          if (remuxResult.success) {
+            // 混流成功，删除原始的不带索引的 webm，更新为 mp4 路径
+            await fs.unlink(videoPath).catch(e => console.error('删除原始 webm 失败', e))
+            videoPath = mp4Path
+            fileName = mp4FileName
+          }
+        } catch (e) {
+          console.error('[Remux] 混流过程发生异常 (这不影响视频本身):', e)
+          // 降级：如果失败，就继续用原来的 webm
+        }
+      }
+
       currentVideoPath = videoPath;
 
       // 保存鼠标位置和点击数据

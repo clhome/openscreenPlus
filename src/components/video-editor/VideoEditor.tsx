@@ -663,20 +663,28 @@ export default function VideoEditor() {
       exporterRef.current = exporter;
       const result = await exporter.export();
 
-      if (result.success && result.blob) {
-        const arrayBuffer = await result.blob.arrayBuffer();
+      if (result.success && (result.blob || result.filePath)) {
         const timestamp = Date.now();
         const fileName = `export-${timestamp}.mp4`;
 
-        const saveResult = await window.electronAPI.saveExportedVideo(arrayBuffer, fileName);
+        let saveResult;
+        if (result.filePath) {
+          // 如果是 FFmpeg 导出，直接移动临时文件
+          saveResult = await window.electronAPI.ffmpegExport.saveVideo(result.filePath, fileName);
+        } else if (result.blob) {
+          // 浏览器传统导出，传递 ArrayBuffer
+          const arrayBuffer = await result.blob.arrayBuffer();
+          saveResult = await window.electronAPI.saveExportedVideo(arrayBuffer, fileName);
+        }
 
-        if (saveResult.cancelled) {
+        if (saveResult && (saveResult as any).cancelled) {
           toast.info(t('editor.exportCancelled'));
-        } else if (saveResult.success) {
+        } else if (saveResult && saveResult.success) {
           toast.success(t('editor.exportSuccess'));
         } else {
-          setExportError(saveResult.message || t('editor.failedToSave'));
-          toast.error(saveResult.message || t('editor.failedToSave'));
+          const msg = (saveResult as any)?.message || (saveResult as any)?.error || t('editor.failedToSave');
+          setExportError(msg);
+          toast.error(msg);
         }
       } else {
         setExportError(result.error || t('editor.exportFailed'));

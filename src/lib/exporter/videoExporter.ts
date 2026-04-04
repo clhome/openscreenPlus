@@ -73,6 +73,11 @@ export class VideoExporter {
       this.cleanup();
       this.cancelled = false;
 
+      // 0. 检查是否可以使用 FFmpeg 高速导出
+      if (window.electronAPI?.ffmpegExport) {
+        return await this.exportWithFfmpeg();
+      }
+
       // 1. 初始化
       this.decoder = new VideoFileDecoder();
       const videoInfo = await this.decoder.loadVideo(this.config.videoUrl);
@@ -475,6 +480,327 @@ export class VideoExporter {
     } else {
       encoderConfig.hardwareAcceleration = "no-preference";
       this.encoder.configure(encoderConfig);
+    }
+  }
+
+  /**
+   * FFmpeg 高速导出逻辑
+   * 快速路径：无 Zoom/Annotation 时使用纯 FFmpeg 管线（10-20x）
+   * 慢速路径：有复杂特效时使用 PixiJS 渲染 + FFmpeg 编码（~1x）
+   */
+  private async exportWithFfmpeg(): Promise<ExportResult> {
+    const hasZoom = this.config.zoomRegions && this.config.zoomRegions.length > 0;
+    const hasAnnotations = this.config.annotationRegions && this.config.annotationRegions.length > 0;
+    const canUseFastPath = !hasZoom && !hasAnnotations;
+
+    if (canUseFastPath) {
+      return await this.exportFastPath();
+    }
+    try {
+      // 慢速路径：1. 初始化资源
+      this.decoder = new VideoFileDecoder();
+      const videoInfo = await this.decoder.loadVideo(this.config.videoUrl);
+      this.videoElement = this.decoder.getVideoElement();
+      if (!this.videoElement) throw new Error("Video element not available");
+
+      this.renderer = new FrameRenderer({
+        width: this.config.width,
+        height: this.config.height,
+        wallpaper: this.config.wallpaper,
+        zoomRegions: this.config.zoomRegions,
+        showShadow: this.config.showShadow,
+        shadowIntensity: this.config.shadowIntensity,
+        showBlur: this.config.showBlur,
+        motionBlurEnabled: this.config.motionBlurEnabled,
+        borderRadius: this.config.borderRadius,
+        padding: this.config.padding,
+        cropRegion: this.config.cropRegion,
+        videoWidth: videoInfo.width,
+        videoHeight: videoInfo.height,
+        annotationRegions: this.config.annotationRegions,
+        previewWidth: this.config.previewWidth,
+        previewHeight: this.config.previewHeight,
+      });
+      await this.renderer.initialize();
+
+      // 不需要 initializeEncoder，因为编码在主进程
+
+      // 2. 导出准备
+      const effectiveDuration = this.getEffectiveDuration(videoInfo.duration);
+      const totalFrames = Math.ceil(effectiveDuration * this.config.frameRate);
+
+      this.videoElement.muted = true;
+      this.videoElement.pause();
+
+      let processedFrames = 0;
+
+      // 让主窗口通过 IPC 通知系统获取导出路径
+      // 在这里我们需要一个输出路径。为了方便，我们让主进程在 temp 目录生成，
+      // 导出完成后再由 saveExportedVideo 移动。
+      const tempPath = `export_${Date.now()}.mp4`;
+
+      // 启动启动 FFmpeg 会话
+      const startResult = await window.electronAPI.ffmpegExport.start({
+        outputPath: tempPath,
+        width: this.config.width,
+        height: this.config.height,
+        fps: this.config.frameRate,
+        audioPath: this.config.videoUrl, // 传入原始视频路径以提取音轨同步封装
+        crf: 18,
+        useHwAccel: true, // 默认开启硬件加速优化速度
+      });
+
+      if (!startResult.ok) {
+        throw new Error(`FFmpeg start failed: ${startResult.error}`);
+      }
+
+      // 监听完成
+      const exportDonePromise = new Promise<{ success: boolean; outputPath?: string; error?: string }>(
+        (resolve) => {
+          const unsubscribe = window.electronAPI.ffmpegExport.onDone((result) => {
+            unsubscribe();
+            resolve(result);
+          });
+        }
+      );
+
+      // 3. 逐帧渲染主循环 — 使用顺序播放代替逐帧 Seek
+      // Seek 方案在 WebM 上极慢（需要回退到关键帧再解码），顺序播放可利用硬件解码流水线
+      const trimRegions = this.config.trimRegions || [];
+      const segments: { start: number; end: number }[] = [];
+      let currentPos = 0;
+      for (const trim of [...trimRegions].sort((a,b)=>a.startMs-b.startMs)) {
+        if (trim.startMs > currentPos) segments.push({ start: currentPos/1000, end: trim.startMs/1000 });
+        currentPos = trim.endMs;
+      }
+      if (currentPos < videoInfo.duration * 1000) segments.push({ start: currentPos/1000, end: videoInfo.duration });
+      if (segments.length === 0) segments.push({ start: 0, end: videoInfo.duration });
+
+      let cumulativeTime = 0;
+      const configFrameRate = this.config.frameRate;
+
+      for (const segment of segments) {
+        if (this.cancelled) break;
+
+        // 每段只在开头做一次 seek（段间跳转）
+        this.videoElement.currentTime = segment.start;
+        await new Promise<void>((r) => {
+          const onSeeked = () => { this.videoElement?.removeEventListener('seeked', onSeeked); r(); };
+          this.videoElement?.addEventListener('seeked', onSeeked, { once: true });
+          setTimeout(() => { this.videoElement?.removeEventListener('seeked', onSeeked); r(); }, 2000);
+        });
+
+        // 使用顺序播放捕获帧：比逐帧 Seek 快 3-5 倍
+        const segEnd = segment.end;
+        const video = this.videoElement;
+        const renderer = this.renderer;
+        const cancelled = () => this.cancelled;
+        const onProgress = this.config.onProgress;
+        const ffmpegExport = window.electronAPI.ffmpegExport;
+
+        await new Promise<void>((resolveSegment) => {
+          let pending = false; // 防止帧处理重入
+
+          const processNextFrame = async () => {
+            if (pending) return;
+            pending = true;
+
+            try {
+              if (cancelled() || !video) {
+                video?.pause();
+                resolveSegment();
+                return;
+              }
+
+              const currentTime = video.currentTime;
+              if (currentTime >= segEnd - 0.01) {
+                video.pause();
+                resolveSegment();
+                return;
+              }
+
+              // 暂停视频以稳定当前帧
+              video.pause();
+
+              // 捕获 + 渲染
+              let videoFrame: VideoFrame | null = null;
+              try {
+                videoFrame = new VideoFrame(video, { timestamp: 0 });
+                await renderer.renderFrame(videoFrame, currentTime * 1000000);
+              } catch (e) {
+                console.error("[FFmpegExporter] Frame capture failed:", e);
+              } finally {
+                videoFrame?.close();
+              }
+
+              //读取像素（compositeCanvas 是 2D canvas）
+              const canvas = renderer.getCanvas();
+              const ctx = canvas.getContext('2d')!;
+              const frameBuffer = ctx.getImageData(0, 0, canvas.width, canvas.height).data.buffer as ArrayBuffer;
+
+              // 严格音画同步 (Strict CFR sync):
+              // 根据目前累积的时间，计算应该发送多少帧到 FFmpeg
+              const globalVideoTime = cumulativeTime + (currentTime - segment.start);
+              const targetFrames = Math.floor(globalVideoTime * configFrameRate) + 1;
+              const framesToPush = targetFrames - processedFrames;
+
+              if (framesToPush > 0) {
+                // 如果落后目标帧数，补帧（通常是1帧，如果是跳帧或低帧率可能会补偿多帧）
+                for (let i = 0; i < framesToPush; i++) {
+                  let bufferToSend: ArrayBuffer;
+                  if (i === framesToPush - 1) {
+                    bufferToSend = frameBuffer; // 最后一帧直接使用
+                  } else {
+                    bufferToSend = frameBuffer.slice(0); // 复制 buffer 防止被移交所有权
+                  }
+                  
+                  const pushPromise = ffmpegExport.pushFrame(bufferToSend);
+                  processedFrames++;
+
+                  if (onProgress && processedFrames % 5 === 0) {
+                    onProgress({
+                      currentFrame: processedFrames,
+                      totalFrames,
+                      percentage: Math.min(Math.round((processedFrames / totalFrames) * 100), 100),
+                      estimatedTimeRemaining: 0,
+                    });
+                  }
+
+                  // 背压控制：每 10 帧等一次
+                  if (processedFrames % 10 === 0) {
+                    await pushPromise;
+                  }
+                } // 结束 for
+              } // 结束 if
+
+              // 恢复播放，等待下一帧
+              pending = false;
+              video.play();
+
+              if ('requestVideoFrameCallback' in video) {
+                (video as HTMLVideoElement).requestVideoFrameCallback(() => processNextFrame());
+              } else {
+                requestAnimationFrame(() => processNextFrame());
+              }
+
+            } catch (err) {
+              console.error("[FFmpegExporter] Loop error:", err);
+              pending = false;
+              video?.pause();
+              resolveSegment();
+            }
+          };
+
+          // 启动帧回调循环
+          video.playbackRate = 1.0;
+          
+          // 监听视频播放到末尾，防止 requestVideoFrameCallback 不再回调导致卡死
+          video.addEventListener('ended', () => {
+            video.pause();
+            resolveSegment();
+          }, { once: true });
+
+          if ('requestVideoFrameCallback' in video) {
+            (video as HTMLVideoElement).requestVideoFrameCallback(() => processNextFrame());
+          } else {
+            requestAnimationFrame(() => processNextFrame());
+          }
+          video.play();
+        });
+
+        cumulativeTime += (segment.end - segment.start);
+      }
+
+      if (this.cancelled) {
+        await window.electronAPI.ffmpegExport.cancel();
+        return { success: false, error: "Export cancelled" };
+      }
+
+      // 4. 完成
+      await window.electronAPI.ffmpegExport.finish();
+      const doneResult = await exportDonePromise;
+
+      if (!doneResult.success) {
+        throw new Error(doneResult.error || "FFmpeg export failed");
+      }
+      
+      // 返回路径。虽然 ExportResult 类型可能需要更新，
+      // 但我先把它放在 blob 位置或者直接返回。
+      // 注意：这里需要确保 UI 层能处理 blob 为空的情况。
+      return { 
+        success: true, 
+        blob: new Blob([]),
+        filePath: doneResult.outputPath
+      } as ExportResult;
+
+    } catch (error) {
+      console.error("FFmpeg export error:", error);
+      return { success: false, error: String(error) };
+    } finally {
+      this.cleanup();
+    }
+  }
+
+  /**
+   * 快速路径：纯 FFmpeg 管线，10-20x 速度
+   */
+  private async exportFastPath(): Promise<ExportResult> {
+    console.log('[VideoExporter] 使用纯 FFmpeg 快速导出路径');
+
+    const tempPath = `export_${Date.now()}.mp4`;
+
+    // 解析背景色
+    let bgColor = '#1a1a2e';
+    const wallpaper = this.config.wallpaper || '';
+    if (wallpaper.startsWith('#')) {
+      bgColor = wallpaper;
+    } else if (wallpaper.includes('#')) {
+      const match = wallpaper.match(/#[0-9a-fA-F]{3,8}/);
+      if (match) bgColor = match[0];
+    }
+
+    // 监听进度
+    let unsubProgress: (() => void) | null = null;
+    if (this.config.onProgress) {
+      unsubProgress = window.electronAPI.ffmpegExport.onProgress((progress: { percentage: number }) => {
+        this.config.onProgress?.({
+          currentFrame: 0,
+          totalFrames: 100,
+          percentage: progress.percentage,
+          estimatedTimeRemaining: 0,
+        });
+      });
+    }
+
+    try {
+      const result = await window.electronAPI.ffmpegExport.fastExport({
+        inputPath: this.config.videoUrl,
+        outputPath: tempPath,
+        width: this.config.width,
+        height: this.config.height,
+        fps: this.config.frameRate,
+        padding: this.config.padding ?? 32,
+        background: bgColor,
+        crf: 18,
+      });
+
+      unsubProgress?.();
+
+      if (!result.success) {
+        throw new Error(result.error || '快速导出失败');
+      }
+
+      return {
+        success: true,
+        blob: new Blob([]),
+        filePath: result.outputPath,
+      } as ExportResult;
+    } catch (error) {
+      console.error('FFmpeg fast export error:', error);
+      return { success: false, error: String(error) };
+    } finally {
+      unsubProgress?.();
+      this.cleanup();
     }
   }
 
