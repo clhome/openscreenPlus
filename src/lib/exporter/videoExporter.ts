@@ -535,6 +535,24 @@ export class VideoExporter {
 
       let processedFrames = 0;
 
+      // 提取计算片段的逻辑
+      const trimRegions = this.config.trimRegions || [];
+      const segments: { start: number; end: number }[] = [];
+      let currentPos = 0;
+      for (const trim of [...trimRegions].sort((a,b)=>a.startMs-b.startMs)) {
+        if (trim.startMs > currentPos) segments.push({ start: currentPos/1000, end: trim.startMs/1000 });
+        currentPos = trim.endMs;
+      }
+      if (currentPos < videoInfo.duration * 1000) segments.push({ start: currentPos/1000, end: videoInfo.duration });
+      if (segments.length === 0) segments.push({ start: 0, end: videoInfo.duration });
+
+      // 检查是否支持纯全链路前端极速硬解管线 (Option C: 无 IPC 瓶颈)
+      // 如果支持，我们直接启动本地方案，根本不调用 ffmpegExport.start，从而修复后端锁死问题！
+      if ('VideoDecoder' in window && 'VideoEncoder' in window && this.config.videoUrl.endsWith('.mp4')) {
+        console.log('[VideoExporter] WebCodecs Encoder/Decoder is available. Using High-Speed Pure Frontend Pipeline (Option C).');
+        return await this.exportWithPureWebCodecsLocal(segments);
+      }
+
       // 让主窗口通过 IPC 通知系统获取导出路径
       // 在这里我们需要一个输出路径。为了方便，我们让主进程在 temp 目录生成，
       // 导出完成后再由 saveExportedVideo 移动。
@@ -565,26 +583,8 @@ export class VideoExporter {
         }
       );
 
-      // 3. 逐帧渲染主循环 — 使用顺序播放代替逐帧 Seek
-      // Seek 方案在 WebM 上极慢（需要回退到关键帧再解码），顺序播放可利用硬件解码流水线
-      const trimRegions = this.config.trimRegions || [];
-      const segments: { start: number; end: number }[] = [];
-      let currentPos = 0;
-      for (const trim of [...trimRegions].sort((a,b)=>a.startMs-b.startMs)) {
-        if (trim.startMs > currentPos) segments.push({ start: currentPos/1000, end: trim.startMs/1000 });
-        currentPos = trim.endMs;
-      }
-      if (currentPos < videoInfo.duration * 1000) segments.push({ start: currentPos/1000, end: videoInfo.duration });
-      if (segments.length === 0) segments.push({ start: 0, end: videoInfo.duration });
-
       let cumulativeTime = 0;
       const configFrameRate = this.config.frameRate;
-
-      // 检查是否支持纯全链路前端极速硬解管线 (Option C: 无 IPC 瓶颈)
-      if ('VideoDecoder' in window && 'VideoEncoder' in window && this.config.videoUrl.endsWith('.mp4')) {
-        console.log('[VideoExporter] WebCodecs Encoder/Decoder is available. Using High-Speed Pure Frontend Pipeline (Option C).');
-        return await this.exportWithPureWebCodecsLocal(segments);
-      }
 
       for (const segment of segments) {
         if (this.cancelled) break;
