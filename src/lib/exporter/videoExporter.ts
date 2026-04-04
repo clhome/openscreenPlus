@@ -3,6 +3,7 @@ import { VideoFileDecoder } from "./videoDecoder";
 import { FrameRenderer } from "./frameRenderer";
 import { VideoMuxer } from "./muxer";
 import { AudioExtractor } from "./audioExtractor";
+import { MP4Demuxer } from "./mp4Demuxer";
 import type {
   ZoomRegion,
   CropRegion,
@@ -471,7 +472,7 @@ export class VideoExporter {
       framerate: this.config.frameRate,
       latencyMode: "quality",
       bitrateMode: "variable",
-      hardwareAcceleration: "prefer-software",
+      hardwareAcceleration: "prefer-hardware",
     };
 
     const support = await VideoEncoder.isConfigSupported(encoderConfig);
@@ -578,6 +579,12 @@ export class VideoExporter {
 
       let cumulativeTime = 0;
       const configFrameRate = this.config.frameRate;
+
+      // 检查是否支持纯全链路前端极速硬解管线 (Option C: 无 IPC 瓶颈)
+      if ('VideoDecoder' in window && 'VideoEncoder' in window && this.config.videoUrl.endsWith('.mp4')) {
+        console.log('[VideoExporter] WebCodecs Encoder/Decoder is available. Using High-Speed Pure Frontend Pipeline (Option C).');
+        return await this.exportWithPureWebCodecsLocal(segments);
+      }
 
       for (const segment of segments) {
         if (this.cancelled) break;
@@ -844,5 +851,194 @@ export class VideoExporter {
     this.hasAudio = false;
     this.audioChunks = [];
     this.videoElement = null;
+  }
+
+  /**
+   * 纯前端极速架构：彻底解决 getImageData 阻断与 IPC 传输瓶颈，全面接管 解码->渲染->编码->混流
+   */
+  private async exportWithPureWebCodecsLocal(segments: {start: number, end: number}[]): Promise<ExportResult> {
+    const configFrameRate = this.config.frameRate;
+    const totalDuration = segments.reduce((acc, seg) => acc + (seg.end - seg.start), 0);
+    const totalFrames = Math.ceil(totalDuration * configFrameRate);
+    let processedFrames = 0;
+
+    try {
+      this.cancelled = false;
+      this.encodeQueue = 0;
+      this.chunkCount = 0;
+      
+      // 1. 之前慢速路径已初始化了 this.renderer，但安全起见确保可用（如果未初始化则重写一遍也可以不写，因为外面已经调用了）
+      // 外面调用 exportWithPureWebCodecsLocal 时，其实 this.renderer 已经 new 好并初始化了。
+      // 我们必须初始化 Encoder 和 Muxer 和 Audio！
+      
+      await this.initializeEncoder();
+      
+      this.audioExtractor = new AudioExtractor({
+        videoUrl: this.config.videoUrl, // mp4 url
+        trimRegions: this.config.trimRegions?.map((t) => ({ startMs: t.startMs, endMs: t.endMs })),
+      });
+      
+      this.hasAudio = await this.audioExtractor.decode();
+      this.muxer = new VideoMuxer(this.config, this.hasAudio);
+      await this.muxer.initialize();
+
+      if (this.hasAudio) {
+        this.audioChunks = await this.audioExtractor.getAllEncodedChunks();
+      }
+
+      // 3. 执行纯硬件极速流通道
+      // 3. 执行纯硬件极速流通道
+      return await new Promise<ExportResult>((resolve, reject) => {
+        let decoder: VideoDecoder | null = null;
+        let isDecoderFlushed = false;
+        
+        const pendingFrames: VideoFrame[] = [];
+
+        const finishExport = async () => {
+           try {
+             if (this.encoder && this.encoder.state === "configured") {
+               await this.encoder.flush();
+               this.encoder.close();
+             }
+             
+             if (this.audioChunks.length > 0 && this.muxer) {
+               for (const { chunk, meta } of this.audioChunks) {
+                 await this.muxer.addAudioChunkWithAdjustedTimestamp(chunk, meta, 1.0);
+               }
+               this.audioChunks = [];
+             }
+             
+             await Promise.all(this.muxingPromises);
+             const blob = await this.muxer!.finalize();
+             
+             resolve({ success: true, blob } as ExportResult);
+           } catch (e) {
+             reject(e);
+           }
+           this.cleanup();
+        };
+
+        const framePump = async () => {
+           while (!this.cancelled) {
+              if (pendingFrames.length === 0) {
+                 if (isDecoderFlushed) {
+                    break;
+                 }
+                 await new Promise(r => setTimeout(r, 2));
+                 continue;
+              }
+
+              const frame = pendingFrames.shift()!;
+              const frameTime = frame.timestamp / 1e6; // 秒
+
+              // 裁剪逻辑匹配
+              let inSegment = false;
+              let mappedTime = 0;
+              let cumTime = 0;
+              for (const seg of segments) {
+                if (frameTime >= seg.start - 0.05 && frameTime <= seg.end + 0.05) {
+                   inSegment = true;
+                   mappedTime = cumTime + Math.max(0, frameTime - seg.start);
+                   break;
+                }
+                cumTime += (seg.end - seg.start);
+              }
+
+              if (inSegment) {
+                 try {
+                    // 渲染并零拷贝投递给 Encoder (GPU -> GPU)
+                    await this.renderer!.renderFrame(frame, mappedTime * 1e6);
+                    const expectedFrames = Math.floor(mappedTime * configFrameRate) + 1;
+                    const framesToPush = expectedFrames - processedFrames;
+                    
+                    if (framesToPush > 0) {
+                       const canvas = this.renderer!.getCanvas();
+                       for (let i = 0; i < framesToPush; i++) {
+                          const targetTs = Math.round((processedFrames * 1000 * 1000) / configFrameRate); 
+                          
+                          // 等待队列减轻压力
+                          while (this.encodeQueue > this.MAX_ENCODE_QUEUE && !this.cancelled) {
+                             await new Promise(r => setTimeout(r, 2));
+                          }
+                          if (this.cancelled) break;
+                          
+                          // 零拷贝提取。这不涉及主内存！
+                          const newFrame = new VideoFrame(canvas, { timestamp: targetTs });
+                          
+                          this.encodeQueue++;
+                          const isKey = (processedFrames % 30) === 0;
+                          this.encoder!.encode(newFrame, { keyFrame: isKey });
+                          newFrame.close();
+                          
+                          processedFrames++;
+                          this.chunkCount++;
+                          
+                          if (this.config.onProgress && processedFrames % 10 === 0) {
+                            this.config.onProgress({ 
+                              currentFrame: processedFrames, 
+                              totalFrames, 
+                              percentage: Math.min(100, Math.round(processedFrames/totalFrames * 100)), 
+                              estimatedTimeRemaining: 0 
+                            });
+                          }
+                       }
+                    }
+                 } catch (e) {
+                    console.error('[WebCodecs Local] 渲染出错', e);
+                 }
+              }
+              frame.close();
+           }
+           if (!this.cancelled) {
+              finishExport();
+           }
+        };
+
+        // 启动抽水泵
+        framePump();
+
+        decoder = new VideoDecoder({
+          output: (frame) => {
+            if (this.cancelled) {
+               frame.close();
+               return;
+            }
+            pendingFrames.push(frame);
+          },
+          error: (e) => {
+            console.error('[WebCodecs Local] Decoder failed:', e);
+            reject(e);
+          }
+        });
+
+        console.log('[VideoExporter] Start Demuxer inside local WebCodecs run...');
+        const mp4Demux = new MP4Demuxer(this.config.videoUrl, {
+          onConfig: (config) => {
+            if (decoder && decoder.state === 'unconfigured') {
+               decoder.configure({ ...config, hardwareAcceleration: 'prefer-hardware' });
+            }
+          },
+          onChunk: (chunk) => {
+            if (decoder && decoder.state === 'configured') decoder.decode(chunk);
+          },
+          onDone: () => {
+            if (decoder?.state === 'configured') {
+              decoder.flush()
+                .then(() => { isDecoderFlushed = true; })
+                .catch((e) => reject(e));
+            } else {
+               isDecoderFlushed = true;
+            }
+          },
+          getDecodeQueueSize: () => (decoder ? decoder.decodeQueueSize : 0) + pendingFrames.length
+        });
+        
+        if (!mp4Demux) reject(new Error("MP4Demuxer init failed"));
+      });
+      
+    } catch (e) {
+      this.cleanup();
+      throw e;
+    }
   }
 }
